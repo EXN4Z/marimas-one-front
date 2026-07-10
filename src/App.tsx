@@ -4,6 +4,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import VerifyOtp from './pages/VerifyOtp';
 import Dashboard from './pages/Dashboard';
+import Inventaris from './pages/Inventaris';
 
 function App() {
   return (
@@ -14,6 +15,7 @@ function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/verify-otp" element={<VerifyOtp />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/inventaris" element={<Inventaris />} />
           <Route path="/" element={<Login />} />
         </Routes>
       </BrowserRouter>
