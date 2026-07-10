@@ -97,9 +97,6 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
       >
         <div className="flex items-center justify-between px-6 h-20 border-b border-slate-100">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-slate-900 flex items-center justify-center text-white font-bold text-sm">
-              M1
-            </div>
             <span className="font-bold text-slate-900 tracking-tight">MARIMAS ONE</span>
           </div>
           <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400">
