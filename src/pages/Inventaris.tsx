@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Package, ArrowDownCircle, ArrowUpCircle, Search, X, AlertTriangle } from 'lucide-react';
-import AppLayout from '../components/Applayout';
+import { Package, ArrowDownCircle, ArrowUpCircle, Search, X, AlertTriangle, ScanLine, QrCode } from 'lucide-react';
+import AppLayout from '../components/AppLayout';
+import ScanQrModal from '../components/ScanQrModal';
+import QrCodeModal from '../components/QrCodeModal';
 import {
   getBarang,
   getRiwayatSemua,
+  getBarangByKode,
   scanMasuk,
   scanKeluar,
   type Barang,
   type Mutasi,
-} from '../api/Barang';
+} from '../api/barang';
 
 function formatWaktu(iso: string): string {
   const date = new Date(iso);
@@ -32,10 +35,17 @@ export default function Inventaris() {
   const [search, setSearch] = useState('');
 
   const [modalBarang, setModalBarang] = useState<Barang | null>(null);
-  const [modalTipe, setModalTipe] = useState<'masuk' | 'keluar'>('masuk');
+  // modalTipe null berarti "belum dipilih" -> tampilkan langkah pilih Masuk/Keluar dulu
+  // (dipakai saat barang ditemukan lewat scan QR). Jika langsung 'masuk'/'keluar',
+  // form jumlah langsung tampil (dipakai saat klik tombol cepat di daftar barang).
+  const [modalTipe, setModalTipe] = useState<'masuk' | 'keluar' | null>('masuk');
   const [jumlahInput, setJumlahInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
+
+  const [scannerOpen, setScannerOpen] = useState(false);
+  const [scanError, setScanError] = useState('');
+  const [qrBarang, setQrBarang] = useState<Barang | null>(null);
 
   const loadData = async () => {
     setLoading(true);
@@ -79,6 +89,23 @@ export default function Inventaris() {
     setModalError('');
   };
 
+  const handleScanSuccess = async (kodeBarang: string) => {
+    setScannerOpen(false);
+    setScanError('');
+    try {
+      const found = await getBarangByKode(kodeBarang);
+      // Barang ketemu -> buka modal dalam mode "pilih tipe dulu" (masuk/keluar)
+      setModalBarang(found);
+      setModalTipe(null);
+      setJumlahInput('');
+      setModalError('');
+    } catch (err: any) {
+      setScanError(
+        err.response?.data?.message || `Kode "${kodeBarang}" tidak dikenali sebagai barang.`
+      );
+    }
+  };
+
   const handleSubmitMutasi = async () => {
     if (!modalBarang || !jumlahInput || Number(jumlahInput) <= 0) return;
 
@@ -113,11 +140,30 @@ export default function Inventaris() {
     <AppLayout title="Inventaris">
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-slate-500">Kelola stok barang masuk & keluar.</p>
+        <button
+          onClick={() => {
+            setScanError('');
+            setScannerOpen(true);
+          }}
+          className="flex items-center gap-2 bg-slate-900 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-slate-800 transition"
+        >
+          <ScanLine size={16} />
+          Scan QR
+        </button>
       </div>
 
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
           {error}
+        </div>
+      )}
+
+      {scanError && (
+        <div className="mb-6 flex items-center justify-between bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg px-4 py-3">
+          <span>{scanError}</span>
+          <button onClick={() => setScanError('')} className="text-amber-500 hover:text-amber-700">
+            <X size={16} />
+          </button>
         </div>
       )}
 
@@ -190,6 +236,13 @@ export default function Inventaris() {
                   </div>
                   <div className="flex gap-1.5">
                     <button
+                      onClick={() => setQrBarang(item)}
+                      title="Lihat / Cetak QR"
+                      className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition"
+                    >
+                      <QrCode size={16} />
+                    </button>
+                    <button
                       onClick={() => openModal(item, 'masuk')}
                       title="Barang Masuk"
                       className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
@@ -248,7 +301,46 @@ export default function Inventaris() {
       </div>
 
       {/* MODAL SCAN */}
-      {modalBarang && (
+      {modalBarang && modalTipe === null && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-slate-900">Barang Ditemukan</h3>
+              <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 rounded-lg p-3 mb-5">
+              <p className="text-sm font-medium text-slate-800">{modalBarang.nama}</p>
+              <p className="text-xs text-slate-400">
+                {modalBarang.kode_barang} · Stok saat ini: {modalBarang.stok} {modalBarang.satuan}
+              </p>
+            </div>
+
+            <p className="text-sm font-medium text-slate-700 mb-3">Barang ini masuk atau keluar?</p>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setModalTipe('masuk')}
+                className="flex-1 flex flex-col items-center gap-1.5 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-lg py-4 hover:bg-emerald-100 transition"
+              >
+                <ArrowDownCircle size={22} />
+                <span className="text-sm font-semibold">Masuk</span>
+              </button>
+              <button
+                onClick={() => setModalTipe('keluar')}
+                className="flex-1 flex flex-col items-center gap-1.5 border border-red-200 bg-red-50 text-red-700 rounded-lg py-4 hover:bg-red-100 transition"
+              >
+                <ArrowUpCircle size={22} />
+                <span className="text-sm font-semibold">Keluar</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalBarang && modalTipe !== null && (
         <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
             <div className="flex items-center justify-between mb-4">
@@ -294,13 +386,15 @@ export default function Inventaris() {
             >
               {submitting ? 'Memproses...' : `Konfirmasi ${modalTipe === 'masuk' ? 'Barang Masuk' : 'Barang Keluar'}`}
             </button>
-
-            <p className="text-[11px] text-slate-400 text-center mt-3">
-              *Sementara input manual — fitur scan kamera QR menyusul.
-            </p>
           </div>
         </div>
       )}
+
+      {scannerOpen && (
+        <ScanQrModal onClose={() => setScannerOpen(false)} onScanSuccess={handleScanSuccess} />
+      )}
+
+      {qrBarang && <QrCodeModal barang={qrBarang} onClose={() => setQrBarang(null)} />}
     </AppLayout>
   );
 }

@@ -23,7 +23,7 @@ import {
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/Chatwidget';
-import AppLayout from '../components/Applayout';
+import AppLayout from '../components/AppLayout';
 import api from '../api/axios';
 import type { User as UserType } from '../types/user';
 

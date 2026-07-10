@@ -50,7 +50,7 @@ export const scanMasuk = async (
   jumlah: number,
   catatan?: string
 ): Promise<{ message: string; barang: Barang; mutasi: Mutasi }> => {
-  const res = await api.post(`/barang/${id}/scan-masuk`, { jumlah, catatan });
+  const res = await api.post(`/barang/${id}/masuk`, { jumlah, catatan });
   return res.data;
 };
 
@@ -59,7 +59,7 @@ export const scanKeluar = async (
   jumlah: number,
   catatan?: string
 ): Promise<{ message: string; barang: Barang; mutasi: Mutasi }> => {
-  const res = await api.post(`/barang/${id}/scan-keluar`, { jumlah, catatan });
+  const res = await api.post(`/barang/${id}/keluar`, { jumlah, catatan });
   return res.data;
 };
 
@@ -70,5 +70,14 @@ export const getRiwayatBarang = async (id: number): Promise<Mutasi[]> => {
 
 export const getRiwayatSemua = async (limit = 10): Promise<Mutasi[]> => {
   const res = await api.get(`/mutasi-barang?limit=${limit}`);
+  return res.data;
+};
+
+/**
+ * Cari barang berdasarkan kode_barang hasil scan QR code.
+ * Melempar error (axios) jika barang tidak ditemukan (404).
+ */
+export const getBarangByKode = async (kodeBarang: string): Promise<Barang> => {
+  const res = await api.get(`/barang/kode/${encodeURIComponent(kodeBarang)}`);
   return res.data;
 };
