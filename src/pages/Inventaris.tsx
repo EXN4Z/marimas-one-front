@@ -33,6 +33,7 @@ export default function Inventaris() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [activeTab, setActiveTab] = useState<'semua' | 'stok_menipis'>('semua');
 
   const [modalBarang, setModalBarang] = useState<Barang | null>(null);
   // modalTipe null berarti "belum dipilih" -> tampilkan langkah pilih Masuk/Keluar dulu
@@ -52,11 +53,13 @@ export default function Inventaris() {
     setError('');
     try {
       const [barangData, mutasiData] = await Promise.all([getBarang(), getRiwayatSemua(10)]);
+      console.log('barangData', barangData);
       setBarang(barangData);
       setMutasi(mutasiData);
     } catch (err) {
       setError('Gagal memuat data inventaris. Coba refresh halaman.');
       console.error(err);
+      console.log(err);
     } finally {
       setLoading(false);
     }
@@ -66,11 +69,13 @@ export default function Inventaris() {
     loadData();
   }, []);
 
-  const filteredBarang = barang.filter(
-    (b) =>
-      b.nama.toLowerCase().includes(search.toLowerCase()) ||
-      b.kode_barang.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredBarang = barang
+    .filter(
+      (b) =>
+        b.nama.toLowerCase().includes(search.toLowerCase()) ||
+        b.kode_barang.toLowerCase().includes(search.toLowerCase())
+    )
+    .filter((b) => activeTab === 'semua' || b.stok < b.stok_minimum);
 
   const totalBarang = barang.length;
   const stokMenipis = barang.filter((b) => b.stok < b.stok_minimum).length;
@@ -138,7 +143,7 @@ export default function Inventaris() {
 
   return (
     <AppLayout title="Inventaris">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-2">
         <p className="text-sm text-slate-500">Kelola stok barang masuk & keluar.</p>
         <button
           onClick={() => {
@@ -151,6 +156,43 @@ export default function Inventaris() {
           Scan QR
         </button>
       </div>
+
+      <nav className="mb-6">
+        <ul className="flex items-center gap-6 border-b border-slate-200">
+          <li>
+            <button
+              onClick={() => setActiveTab('semua')}
+              className={`flex items-center gap-2 pb-3 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                activeTab === 'semua'
+                  ? 'border-slate-900 text-slate-900 font-medium'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <Package size={16} />
+              Semua Barang
+              <span className="text-xs bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded-full">
+                {totalBarang}
+              </span>
+            </button>
+          </li>
+          <li>
+            <button
+              onClick={() => setActiveTab('stok_menipis')}
+              className={`flex items-center gap-2 pb-3 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors ${
+                activeTab === 'stok_menipis'
+                  ? 'border-slate-900 text-slate-900 font-medium'
+                  : 'border-transparent text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              <AlertTriangle size={16} />
+              Stok Menipis
+              <span className="text-xs bg-red-50 text-red-600 px-1.5 py-0.5 rounded-full">
+                {stokMenipis}
+              </span>
+            </button>
+          </li>
+        </ul>
+      </nav>
 
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">
@@ -167,34 +209,7 @@ export default function Inventaris() {
         </div>
       )}
 
-      {/* STAT CARDS */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-slate-100 text-slate-700">
-            <Package size={20} />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 mt-3">{totalBarang}</p>
-          <p className="text-xs text-slate-500 mt-1">Total Jenis Barang</p>
-        </div>
-
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-50 text-red-600">
-            <AlertTriangle size={20} />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 mt-3">{stokMenipis}</p>
-          <p className="text-xs text-slate-500 mt-1">Stok Menipis</p>
-        </div>
-
-        <div className="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-slate-100 text-slate-700">
-            <ArrowDownCircle size={20} />
-          </div>
-          <p className="text-2xl font-bold text-slate-900 mt-3">{mutasiHariIni}</p>
-          <p className="text-xs text-slate-500 mt-1">Mutasi Terbaru</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* DAFTAR BARANG */}
         <div className="lg:col-span-2 bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 className="text-base font-semibold text-slate-900 mb-4">Daftar Barang</h3>
@@ -269,7 +284,9 @@ export default function Inventaris() {
 
         {/* RIWAYAT MUTASI */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">Riwayat Mutasi</h3>
+          <h3 className="text-base font-semibold text-slate-900 mb-4">
+            Riwayat Mutasi <span className="text-slate-400 font-normal">({mutasiHariIni})</span>
+          </h3>
           <ul className="flex flex-col gap-4">
             {mutasi.map((m) => (
               <li key={m.id} className="flex items-start gap-3">

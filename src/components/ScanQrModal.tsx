@@ -5,11 +5,18 @@ import { X, ScanLine, AlertCircle } from 'lucide-react';
 interface ScanQrModalProps {
   onClose: () => void;
   onScanSuccess: (decodedText: string) => void;
+  title?: string;
+  description?: string;
 }
 
 const SCANNER_ELEMENT_ID = 'qr-scanner-region';
 
-export default function ScanQrModal({ onClose, onScanSuccess }: ScanQrModalProps) {
+export default function ScanQrModal({
+  onClose,
+  onScanSuccess,
+  title = 'Scan QR Barang',
+  description = 'Arahkan kamera ke QR code pada label barang.',
+}: ScanQrModalProps) {
   const [error, setError] = useState('');
   const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
   const hasHandledScan = useRef(false);
@@ -79,7 +86,7 @@ export default function ScanQrModal({ onClose, onScanSuccess }: ScanQrModalProps
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-base font-semibold text-slate-900 flex items-center gap-2">
             <ScanLine size={18} />
-            Scan QR Barang
+            {title}
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X size={20} />
@@ -98,9 +105,7 @@ export default function ScanQrModal({ onClose, onScanSuccess }: ScanQrModalProps
           </div>
         )}
 
-        <p className="text-[11px] text-slate-400 text-center mt-3">
-          Arahkan kamera ke QR code pada label barang.
-        </p>
+        <p className="text-[11px] text-slate-400 text-center mt-3">{description}</p>
       </div>
     </div>
   );
