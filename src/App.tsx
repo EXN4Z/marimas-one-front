@@ -5,6 +5,9 @@ import Register from './pages/Register';
 import VerifyOtp from './pages/VerifyOtp';
 import Dashboard from './pages/Dashboard';
 import Inventaris from './pages/Inventaris';
+import Karyawan from './pages/Karyawan';
+import KaryawanEdit from './pages/KaryawanEdit';
+import KaryawanCreate from './pages/KaryawanCreate';
 
 function App() {
   return (
@@ -16,6 +19,9 @@ function App() {
           <Route path="/verify-otp" element={<VerifyOtp />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/inventaris" element={<Inventaris />} />
+          <Route path="/karyawan" element={<Karyawan />} />
+          <Route path="/karyawan/:id/edit" element={<KaryawanEdit />} />
+          <Route path="/karyawan/create" element={<KaryawanCreate />} />
           <Route path="/" element={<Login />} />
         </Routes>
       </BrowserRouter>

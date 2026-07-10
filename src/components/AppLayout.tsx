@@ -29,7 +29,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-  { label: 'Data Karyawan', icon: Users, path: null },
+  { label: 'Data Karyawan', icon: Users, path: '/karyawan' },
   { label: 'Absensi QR', icon: QrCode, path: null },
   { label: 'Pengajuan Cuti', icon: CalendarDays, path: null },
   { label: 'Pengajuan Izin', icon: FileText, path: null },

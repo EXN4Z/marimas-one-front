@@ -52,11 +52,13 @@ export default function Inventaris() {
     setError('');
     try {
       const [barangData, mutasiData] = await Promise.all([getBarang(), getRiwayatSemua(10)]);
+      console.log('barangData', barangData);
       setBarang(barangData);
       setMutasi(mutasiData);
     } catch (err) {
       setError('Gagal memuat data inventaris. Coba refresh halaman.');
       console.error(err);
+      console.log(err);
     } finally {
       setLoading(false);
     }
