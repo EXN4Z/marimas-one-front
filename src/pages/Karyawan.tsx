@@ -87,6 +87,7 @@ export default function KaryawanPage() {
     const [users, setUsers] = useState<User[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [errorMsg, setErrorMsg] = useState<string>('');
+    const [currentRole, setCurrentRole] = useState<Role | null>(null); // BARU: untuk cek role user saat ini
 
     const [search, setSearch] = useState<string>('');
     const [activeTab, setActiveTab] = useState<TabKey>('semua');
@@ -94,6 +95,8 @@ export default function KaryawanPage() {
     const [deleting, setDeleting] = useState<boolean>(false);
 
     useEffect(() => {
+        api.get<{ role: Role }>('/user').then((res) => setCurrentRole(res.data.role)).catch(() => {});
+
         api
             .get<User[]>('/karyawan')
             .then((res) => setUsers(res.data))
@@ -106,6 +109,8 @@ export default function KaryawanPage() {
             })
             .finally(() => setLoading(false));
     }, []);
+
+    const isAdmin = currentRole === 'admin';
 
     const filtered = useMemo<User[]>(() => {
         const q = search.toLowerCase().trim();
@@ -188,12 +193,14 @@ export default function KaryawanPage() {
                                 className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black/10"
                             />
                         </div>
-                        <button
-                            onClick={() => navigate('/karyawan/create')}
-                            className="flex items-center justify-center gap-2 bg-black text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-800 whitespace-nowrap"
-                        >
-                            + Tambah Karyawan
-                        </button>
+                            {isAdmin && (
+                                <button
+                                    onClick={() => navigate('/karyawan/create')}
+                                    className="flex items-center justify-center gap-2 bg-black text-white text-sm px-4 py-2 rounded-lg hover:bg-gray-800 whitespace-nowrap"
+                                >
+                                    + Tambah Karyawan
+                                </button>
+                            )}
                     </div>
 
                     <p className="text-sm text-gray-500 mb-4">
@@ -214,6 +221,7 @@ export default function KaryawanPage() {
                                 <UserRow
                                     key={user.id}
                                     user={user}
+                                    isAdmin={isAdmin}
                                     onDelete={() => setUserToDelete(user)}
                                     onEdit={() => navigate(`/karyawan/${user.id}/edit`)}
                                 />
@@ -237,12 +245,12 @@ export default function KaryawanPage() {
 
 interface UserRowProps {
     user: User;
+    isAdmin: boolean;
     onDelete: () => void;
     onEdit: () => void;
 }
 
-function UserRow({ user, onDelete, onEdit }: UserRowProps) {
-
+function UserRow({ user, isAdmin, onDelete, onEdit }: UserRowProps) {
     return (
         <div className="flex items-center justify-between py-3">
             <div className="flex items-center gap-3">
@@ -263,12 +271,16 @@ function UserRow({ user, onDelete, onEdit }: UserRowProps) {
                         {user.pekerja.divisi?.nama || 'Divisi tidak ditentukan'}
                     </span>
                 )}
-                <button onClick={onEdit} className="text-xs text-gray-500 hover:text-black">
-                    Edit
-                </button>
-                <button onClick={onDelete} className="text-xs text-red-600 hover:text-red-700">
-                    Hapus
-                </button>
+                {isAdmin && (
+                    <>
+                        <button onClick={onEdit} className="text-xs text-gray-500 hover:text-black">
+                            Edit
+                        </button>
+                        <button onClick={onDelete} className="text-xs text-red-600 hover:text-red-700">
+                            Hapus
+                        </button>
+                    </>
+                )}
             </div>
         </div>
     );

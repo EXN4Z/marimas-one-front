@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import AdminRoute from './components/AdminRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import VerifyOtp from './pages/VerifyOtp';
@@ -21,8 +22,22 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/inventaris" element={<Inventaris />} />
           <Route path="/karyawan" element={<Karyawan />} />
-          <Route path="/karyawan/:id/edit" element={<KaryawanEdit />} />
-          <Route path="/karyawan/create" element={<KaryawanCreate />} />
+          <Route
+            path="/karyawan/:id/edit"
+            element={
+              <AdminRoute>
+                <KaryawanEdit />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/karyawan/create"
+            element={
+              <AdminRoute>
+                <KaryawanCreate />
+              </AdminRoute>
+            }
+          />
           <Route path="/absensi" element={<Absensi />} />
           <Route path="/" element={<Login />} />
         </Routes>

@@ -20,16 +20,15 @@ import {
   getAbsensiHariIni,
   getRiwayatAbsensi,
   getKaryawanByKode,
-  scanAbsenMasuk,
-  scanAbsenPulang,
+  scanAbsen,
   type Karyawan,
   type Absensi,
+  type Role,
 } from '../api/absensi';
 
 type TabKey = 'semua' | 'sudah_absen' | 'belum_absen';
-type ModalTipe = 'masuk' | 'pulang' | 'selesai';
 
-const roleLabels: Record<Karyawan['role'], string> = {
+const roleLabels: Record<Role, string> = {
   admin: 'Admin',
   hr: 'HR',
   manajer: 'Manajer',
@@ -45,13 +44,14 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
-function formatJam(iso: string | null): string {
-  if (!iso) return '-';
-  return new Date(iso).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+function formatJam(time: string | null): string {
+  if (!time) return '-';
+  // jam_masuk/jam_pulang dari backend format "HH:mm:ss"
+  return time.slice(0, 5);
 }
 
-function formatWaktu(iso: string): string {
-  const date = new Date(iso);
+function formatWaktu(tanggal: string): string {
+  const date = new Date(tanggal);
   const diffMs = Date.now() - date.getTime();
   const diffMin = Math.floor(diffMs / 60000);
 
@@ -73,10 +73,9 @@ export default function AbsensiPage() {
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('semua');
 
-  // modal konfirmasi absen (dipicu dari scan ATAU dari tombol manual di daftar)
   const [modalKaryawan, setModalKaryawan] = useState<Karyawan | null>(null);
   const [modalAbsensi, setModalAbsensi] = useState<Absensi | null>(null);
-  const [modalTipe, setModalTipe] = useState<ModalTipe | null>(null);
+  const [modalTipe, setModalTipe] = useState<'masuk' | 'pulang' | 'sudah_lengkap' | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
@@ -108,14 +107,14 @@ export default function AbsensiPage() {
     loadData();
   }, []);
 
-  const findAbsensi = (karyawanId: number) =>
-    absensiHariIni.find((a) => a.karyawan.id === karyawanId) || null;
+  const findAbsensi = (pekerjaId: number) =>
+    absensiHariIni.find((a) => a.karyawan_id === pekerjaId) || null;
 
   const filteredKaryawan = karyawanList
     .filter(
       (k) =>
-        k.name.toLowerCase().includes(search.toLowerCase()) ||
-        k.kode_karyawan.toLowerCase().includes(search.toLowerCase())
+        k.user.name.toLowerCase().includes(search.toLowerCase()) ||
+        k.nip.toLowerCase().includes(search.toLowerCase())
     )
     .filter((k) => {
       const rec = findAbsensi(k.id);
@@ -129,9 +128,15 @@ export default function AbsensiPage() {
   const sudahAbsenCount = karyawanList.filter((k) => !!findAbsensi(k.id)?.jam_masuk).length;
   const belumAbsenCount = totalKaryawan - sudahAbsenCount;
 
-  const openModal = (item: Karyawan, tipe: ModalTipe) => {
+  const openModal = (item: Karyawan) => {
+    const rec = findAbsensi(item.id);
+    let tipe: 'masuk' | 'pulang' | 'sudah_lengkap';
+    if (!rec || !rec.jam_masuk) tipe = 'masuk';
+    else if (!rec.jam_pulang) tipe = 'pulang';
+    else tipe = 'sudah_lengkap';
+
     setModalKaryawan(item);
-    setModalAbsensi(findAbsensi(item.id));
+    setModalAbsensi(rec);
     setModalTipe(tipe);
     setModalError('');
   };
@@ -147,16 +152,15 @@ export default function AbsensiPage() {
     setScannerOpen(false);
     setScanError('');
     try {
-      const found = await getKaryawanByKode(kode);
-      const rec = findAbsensi(found.id);
+      const { pekerja, absensi_hari_ini } = await getKaryawanByKode(kode);
 
-      let tipe: ModalTipe;
-      if (!rec || !rec.jam_masuk) tipe = 'masuk';
-      else if (!rec.jam_pulang) tipe = 'pulang';
-      else tipe = 'selesai';
+      let tipe: 'masuk' | 'pulang' | 'sudah_lengkap';
+      if (!absensi_hari_ini || !absensi_hari_ini.jam_masuk) tipe = 'masuk';
+      else if (!absensi_hari_ini.jam_pulang) tipe = 'pulang';
+      else tipe = 'sudah_lengkap';
 
-      setModalKaryawan(found);
-      setModalAbsensi(rec);
+      setModalKaryawan(pekerja);
+      setModalAbsensi(absensi_hari_ini);
       setModalTipe(tipe);
       setModalError('');
     } catch (err: any) {
@@ -167,13 +171,12 @@ export default function AbsensiPage() {
   };
 
   const handleConfirmAbsen = async () => {
-    if (!modalKaryawan || !modalTipe || modalTipe === 'selesai') return;
+    if (!modalKaryawan || modalTipe === 'sudah_lengkap') return;
 
     setSubmitting(true);
     setModalError('');
     try {
-      const fn = modalTipe === 'masuk' ? scanAbsenMasuk : scanAbsenPulang;
-      const result = await fn(modalKaryawan.id);
+      const result = await scanAbsen(modalKaryawan.qr_code);
 
       setAbsensiHariIni((prev) => {
         const exists = prev.some((a) => a.id === result.absensi.id);
@@ -181,7 +184,7 @@ export default function AbsensiPage() {
           ? prev.map((a) => (a.id === result.absensi.id ? result.absensi : a))
           : [...prev, result.absensi];
       });
-      setRiwayat((prev) => [result.absensi, ...prev].slice(0, 10));
+      setRiwayat((prev) => [{ ...result.absensi, pekerja: result.pekerja }, ...prev].slice(0, 10));
 
       closeModal();
     } catch (err: any) {
@@ -293,7 +296,7 @@ export default function AbsensiPage() {
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Cari nama atau kode karyawan..."
+              placeholder="Cari nama atau NIP..."
               className="w-full pl-9 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
             />
           </div>
@@ -311,19 +314,24 @@ export default function AbsensiPage() {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-700 flex-shrink-0">
-                      {initials(item.name)}
+                      {initials(item.user.name)}
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-800 truncate">{item.name}</p>
-                        {rec?.status === 'terlambat' && (
+                        <p className="text-sm font-medium text-slate-800 truncate">{item.user.name}</p>
+                        {rec?.status === 'telat' && (
                           <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex-shrink-0">
                             Terlambat
                           </span>
                         )}
+                        {rec?.status_pulang === 'pulang_cepat' && (
+                          <span className="text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                            Pulang Cepat
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-400">
-                        {item.kode_karyawan} · {roleLabels[item.role]}
+                        {item.nip} · {roleLabels[item.user.role]} · {item.divisi?.nama || '-'}
                       </p>
                     </div>
                   </div>
@@ -347,7 +355,7 @@ export default function AbsensiPage() {
                       </button>
                       {!sudahMasuk && (
                         <button
-                          onClick={() => openModal(item, 'masuk')}
+                          onClick={() => openModal(item)}
                           title="Tandai Masuk"
                           className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
                         >
@@ -356,7 +364,7 @@ export default function AbsensiPage() {
                       )}
                       {sudahMasuk && !sudahPulang && (
                         <button
-                          onClick={() => openModal(item, 'pulang')}
+                          onClick={() => openModal(item)}
                           title="Tandai Pulang"
                           className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition"
                         >
@@ -398,11 +406,11 @@ export default function AbsensiPage() {
                 </span>
                 <div className="min-w-0">
                   <p className="text-sm text-slate-800">
-                    <span className="font-medium">{r.karyawan.name}</span>{' '}
+                    <span className="font-medium">{r.pekerja?.user.name ?? '-'}</span>{' '}
                     {r.jam_pulang ? 'absen pulang' : 'absen masuk'}
                   </p>
                   <p className="text-xs text-slate-400">
-                    {formatJam(r.jam_pulang ?? r.jam_masuk)} · {formatWaktu(r.jam_pulang ?? r.jam_masuk ?? r.tanggal)}
+                    {formatJam(r.jam_pulang ?? r.jam_masuk)} · {formatWaktu(r.tanggal)}
                   </p>
                 </div>
               </li>
@@ -423,7 +431,7 @@ export default function AbsensiPage() {
               <h3 className="text-base font-semibold text-slate-900">
                 {modalTipe === 'masuk' && 'Absen Masuk'}
                 {modalTipe === 'pulang' && 'Absen Pulang'}
-                {modalTipe === 'selesai' && 'Absen Lengkap'}
+                {modalTipe === 'sudah_lengkap' && 'Absen Lengkap'}
               </h3>
               <button onClick={closeModal} className="text-slate-400 hover:text-slate-600">
                 <X size={20} />
@@ -431,9 +439,9 @@ export default function AbsensiPage() {
             </div>
 
             <div className="bg-slate-50 rounded-lg p-3 mb-5">
-              <p className="text-sm font-medium text-slate-800">{modalKaryawan.name}</p>
+              <p className="text-sm font-medium text-slate-800">{modalKaryawan.user.name}</p>
               <p className="text-xs text-slate-400">
-                {modalKaryawan.kode_karyawan} · {roleLabels[modalKaryawan.role]}
+                {modalKaryawan.nip} · {roleLabels[modalKaryawan.user.role]}
               </p>
               {modalAbsensi && (
                 <p className="text-xs text-slate-400 mt-1">
@@ -442,7 +450,7 @@ export default function AbsensiPage() {
               )}
             </div>
 
-            {modalTipe === 'selesai' ? (
+            {modalTipe === 'sudah_lengkap' ? (
               <div className="flex items-start gap-2 text-sm text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-3">
                 <AlertCircle size={16} className="flex-shrink-0 mt-0.5 text-slate-400" />
                 <span>Karyawan ini sudah absen masuk dan pulang hari ini.</span>

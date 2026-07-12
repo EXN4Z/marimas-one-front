@@ -28,7 +28,7 @@ export default function KaryawanQrModal({ karyawan, onClose }: KaryawanQrModalPr
     printWindow.document.write(`
       <html>
         <head>
-          <title>Kartu Absen ${escapeHtml(karyawan.name)}</title>
+          <title>Kartu Absen ${escapeHtml(karyawan.user.name)}</title>
           <style>
             body {
               font-family: system-ui, sans-serif;
@@ -57,8 +57,8 @@ export default function KaryawanQrModal({ karyawan, onClose }: KaryawanQrModalPr
         <body>
           <div class="label">
             ${svgMarkup}
-            <h2>${escapeHtml(karyawan.name)}</h2>
-            <p>${escapeHtml(karyawan.kode_karyawan)}</p>
+            <h2>${escapeHtml(karyawan.user.name)}</h2>
+            <p>${escapeHtml(karyawan.nip)}</p>
           </div>
           <script>
             window.onload = function () {
@@ -86,10 +86,10 @@ export default function KaryawanQrModal({ karyawan, onClose }: KaryawanQrModalPr
           ref={qrContainerRef}
           className="flex flex-col items-center gap-3 border border-slate-200 rounded-lg py-6 mb-4"
         >
-          <QRCodeSVG value={karyawan.kode_karyawan} size={180} level="M" />
+          <QRCodeSVG value={karyawan.qr_code} size={180} level="M" />
           <div className="text-center">
-            <p className="text-sm font-semibold text-slate-900">{karyawan.name}</p>
-            <p className="text-xs text-slate-400 tracking-wide">{karyawan.kode_karyawan}</p>
+            <p className="text-sm font-semibold text-slate-900">{karyawan.user.name}</p>
+            <p className="text-xs text-slate-400 tracking-wide">{karyawan.nip}</p>
           </div>
         </div>
 
