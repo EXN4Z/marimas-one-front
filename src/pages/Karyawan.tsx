@@ -4,15 +4,20 @@ import api from '../api/axios';
 import AppLayout from '../components/AppLayout';
 
 type Role = 'admin' | 'hr' | 'manajer' | 'karyawan';
-type Status = 'aktif' | 'nonaktif';
 type TabKey = 'semua' | 'karyawan' | 'hr_manajer' | 'admin';
+
+interface Pekerja {
+    nip: string;
+    divisi: { nama: string } | null;
+    jabatan: { nama: string } | null;
+}
 
 interface User {
     id: number;
     name: string;
     email: string;
     role: Role;
-    status: Status;
+    pekerja: Pekerja | null;
 }
 
 const roleStyles: Record<Role, string> = {
@@ -237,7 +242,6 @@ interface UserRowProps {
 }
 
 function UserRow({ user, onDelete, onEdit }: UserRowProps) {
-    const isAktif = user.status === 'aktif';
 
     return (
         <div className="flex items-center justify-between py-3">
@@ -254,10 +258,11 @@ function UserRow({ user, onDelete, onEdit }: UserRowProps) {
                 <span className={`text-xs px-3 py-1 rounded-full ${roleStyles[user.role]}`}>
                     {roleLabels[user.role]}
                 </span>
-                <span className={`text-xs flex items-center gap-1 ${isAktif ? 'text-green-600' : 'text-gray-400'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isAktif ? 'bg-green-500' : 'bg-gray-300'}`} />
-                    {isAktif ? 'Aktif' : 'Nonaktif'}
-                </span>
+                {user.pekerja && (
+                    <span className="text-xs text-gray-500">
+                        {user.pekerja.divisi?.nama || 'Divisi tidak ditentukan'}
+                    </span>
+                )}
                 <button onClick={onEdit} className="text-xs text-gray-500 hover:text-black">
                     Edit
                 </button>

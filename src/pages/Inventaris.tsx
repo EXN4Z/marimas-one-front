@@ -36,9 +36,6 @@ export default function Inventaris() {
   const [activeTab, setActiveTab] = useState<'semua' | 'stok_menipis'>('semua');
 
   const [modalBarang, setModalBarang] = useState<Barang | null>(null);
-  // modalTipe null berarti "belum dipilih" -> tampilkan langkah pilih Masuk/Keluar dulu
-  // (dipakai saat barang ditemukan lewat scan QR). Jika langsung 'masuk'/'keluar',
-  // form jumlah langsung tampil (dipakai saat klik tombol cepat di daftar barang).
   const [modalTipe, setModalTipe] = useState<'masuk' | 'keluar' | null>('masuk');
   const [jumlahInput, setJumlahInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -47,19 +44,18 @@ export default function Inventaris() {
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanError, setScanError] = useState('');
   const [qrBarang, setQrBarang] = useState<Barang | null>(null);
+  const [lookingUpBarang, setLookingUpBarang] = useState(false); // BARU: loading pas lookup barang setelah scan/upload
 
   const loadData = async () => {
     setLoading(true);
     setError('');
     try {
       const [barangData, mutasiData] = await Promise.all([getBarang(), getRiwayatSemua(10)]);
-      console.log('barangData', barangData);
       setBarang(barangData);
       setMutasi(mutasiData);
     } catch (err) {
       setError('Gagal memuat data inventaris. Coba refresh halaman.');
       console.error(err);
-      console.log(err);
     } finally {
       setLoading(false);
     }
@@ -95,19 +91,21 @@ export default function Inventaris() {
   };
 
   const handleScanSuccess = async (kodeBarang: string) => {
-    setScannerOpen(false);
     setScanError('');
+    setLookingUpBarang(true); // modal scan TETEP kebuka, kasih overlay loading
     try {
       const found = await getBarangByKode(kodeBarang);
-      // Barang ketemu -> buka modal dalam mode "pilih tipe dulu" (masuk/keluar)
       setModalBarang(found);
       setModalTipe(null);
       setJumlahInput('');
       setModalError('');
+      setScannerOpen(false); // baru tutup modal scan SETELAH barang ketemu
     } catch (err: any) {
       setScanError(
         err.response?.data?.message || `Kode "${kodeBarang}" tidak dikenali sebagai barang.`
       );
+    } finally {
+      setLookingUpBarang(false);
     }
   };
 
@@ -121,7 +119,6 @@ export default function Inventaris() {
       const fn = modalTipe === 'masuk' ? scanMasuk : scanKeluar;
       const result = await fn(modalBarang.id, jumlah);
 
-      // update state lokal biar langsung kelihatan, tanpa perlu refetch semua
       setBarang((prev) => prev.map((b) => (b.id === result.barang.id ? result.barang : b)));
       setMutasi((prev) => [result.mutasi, ...prev].slice(0, 10));
 
@@ -144,7 +141,7 @@ export default function Inventaris() {
   return (
     <AppLayout title="Inventaris">
       <div className="flex items-center justify-between mb-2">
-        <p className="text-sm text-slate-500">Kelola stok barang masuk & keluar.</p>
+        <p className="text-sm text-slate-500">Kelola stok barang masuk dan keluar.</p>
         <button
           onClick={() => {
             setScanError('');
@@ -240,7 +237,7 @@ export default function Inventaris() {
                     )}
                   </div>
                   <p className="text-xs text-slate-400">
-                    {item.kode_barang} · {item.kategori || '-'}
+                    {item.kode_barang} · {item.kategori_barang?.nama || 'kategori tidak ada'}
                   </p>
                 </div>
 
@@ -285,7 +282,7 @@ export default function Inventaris() {
         {/* RIWAYAT MUTASI */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 className="text-base font-semibold text-slate-900 mb-4">
-            Riwayat Mutasi <span className="text-slate-400 font-normal">({mutasiHariIni})</span>
+            Riwayat <span className="text-slate-400 font-normal">({mutasiHariIni})</span>
           </h3>
           <ul className="flex flex-col gap-4">
             {mutasi.map((m) => (
@@ -408,7 +405,11 @@ export default function Inventaris() {
       )}
 
       {scannerOpen && (
-        <ScanQrModal onClose={() => setScannerOpen(false)} onScanSuccess={handleScanSuccess} />
+        <ScanQrModal
+          onClose={() => setScannerOpen(false)}
+          onScanSuccess={handleScanSuccess}
+          isProcessing={lookingUpBarang}
+        />
       )}
 
       {qrBarang && <QrCodeModal barang={qrBarang} onClose={() => setQrBarang(null)} />}

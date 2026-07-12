@@ -1,19 +1,21 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import AppLayout from '../components/AppLayout';
+import { getDivisi, type Divisi } from '../api/divisi';
+import { getJabatan, type Jabatan } from '../api/jabatan';
 
 type Role = 'admin' | 'hr' | 'manajer' | 'karyawan';
-type Status = 'aktif' | 'nonaktif';
 
 interface FormState {
     name: string;
     email: string;
     phone: string;
     role: Role;
-    status: Status;
-    password: string;
-    password_confirmation: string;
+    nip: string;
+    divisi_id: string;
+    jabatan_id: string;
+    tanggal_masuk: string;
 }
 
 interface FieldErrors {
@@ -25,18 +27,29 @@ const initialForm: FormState = {
     email: '',
     phone: '',
     role: 'karyawan',
-    status: 'aktif',
-    password: '',
-    password_confirmation: '',
+    nip: '',
+    divisi_id: '',
+    jabatan_id: '',
+    tanggal_masuk: '',
 };
 
 export default function CreateKaryawanPage() {
     const navigate = useNavigate();
 
     const [form, setForm] = useState<FormState>(initialForm);
+    const [divisiList, setDivisiList] = useState<Divisi[]>([]);
+    const [jabatanList, setJabatanList] = useState<Jabatan[]>([]);
     const [saving, setSaving] = useState<boolean>(false);
     const [errors, setErrors] = useState<FieldErrors>({});
     const [errorMsg, setErrorMsg] = useState<string>('');
+
+    const [generatedPassword, setGeneratedPassword] = useState<string>('');
+    const [createdName, setCreatedName] = useState<string>('');
+
+    useEffect(() => {
+        getDivisi().then(setDivisiList).catch(() => {});
+        getJabatan().then(setJabatanList).catch(() => {});
+    }, []);
 
     function handleChange<K extends keyof FormState>(key: K, value: FormState[K]) {
         setForm((prev) => ({ ...prev, [key]: value }));
@@ -56,8 +69,15 @@ export default function CreateKaryawanPage() {
         setErrors({});
 
         try {
-            await api.post('/karyawan', form);
-            navigate('/karyawan');
+            const payload = {
+                ...form,
+                divisi_id: form.divisi_id || null,
+                jabatan_id: form.jabatan_id || null,
+                tanggal_masuk: form.tanggal_masuk || null,
+            };
+            const res = await api.post('/karyawan', payload);
+            setGeneratedPassword(res.data.password);
+            setCreatedName(res.data.user.name);
         } catch (err: any) {
             if (err.response?.status === 422) {
                 setErrors(err.response.data.errors ?? {});
@@ -71,13 +91,40 @@ export default function CreateKaryawanPage() {
         }
     }
 
+    if (generatedPassword) {
+        return (
+            <AppLayout title="Tambah Karyawan">
+                <div className="max-w-xl mx-auto">
+                    <div className="bg-white border border-gray-200 rounded-xl p-6 text-center">
+                        <h2 className="text-lg font-bold text-gray-900 mb-2">Karyawan Berhasil Dibuat</h2>
+                        <p className="text-sm text-gray-500 mb-4">
+                            Catat atau kirim password ini ke <span className="font-medium">{createdName}</span>.
+                            Password hanya ditampilkan sekali dan tidak bisa dilihat lagi.
+                        </p>
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg py-3 px-4 mb-6">
+                            <p className="text-2xl font-mono font-bold tracking-wider text-gray-900">
+                                {generatedPassword}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => navigate('/karyawan')}
+                            className="w-full text-sm px-4 py-2 rounded-lg bg-black text-white hover:bg-gray-800"
+                        >
+                            Selesai
+                        </button>
+                    </div>
+                </div>
+            </AppLayout>
+        );
+    }
+
     return (
         <AppLayout title="Tambah Karyawan">
             <div className="max-w-xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h1 className="text-xl font-bold text-gray-900">Tambah Karyawan</h1>
-                        <p className="text-sm text-gray-500 mt-1">Buat akun pengguna baru untuk sistem.</p>
+                        <p className="text-sm text-gray-500 mt-1">Buat akun & data kepegawaian baru.</p>
                     </div>
                     <button
                         onClick={() => navigate('/karyawan')}
@@ -108,7 +155,6 @@ export default function CreateKaryawanPage() {
                             value={form.email}
                             onChange={(e) => handleChange('email', e.target.value)}
                             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
-                            required
                         />
                     </Field>
 
@@ -121,50 +167,68 @@ export default function CreateKaryawanPage() {
                         />
                     </Field>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <Field label="Role" error={errors.role?.[0]}>
-                            <select
-                                value={form.role}
-                                onChange={(e) => handleChange('role', e.target.value as Role)}
-                                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
-                            >
-                                <option value="karyawan">Karyawan</option>
-                                <option value="manajer">Manajer</option>
-                                <option value="hr">HR</option>
-                                <option value="admin">Admin</option>
-                            </select>
-                        </Field>
-
-                        <Field label="Status" error={errors.status?.[0]}>
-                            <select
-                                value={form.status}
-                                onChange={(e) => handleChange('status', e.target.value as Status)}
-                                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
-                            >
-                                <option value="aktif">Aktif</option>
-                                <option value="nonaktif">Nonaktif</option>
-                            </select>
-                        </Field>
-                    </div>
-
-                    <Field label="Password" error={errors.password?.[0]}>
+                    <Field label="NIP" error={errors.nip?.[0]}>
                         <input
-                            type="password"
-                            value={form.password}
-                            onChange={(e) => handleChange('password', e.target.value)}
+                            type="text"
+                            value={form.nip}
+                            onChange={(e) => handleChange('nip', e.target.value)}
                             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
                             required
                         />
                     </Field>
 
-                    <Field label="Konfirmasi Password" error={errors.password_confirmation?.[0]}>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Field label="Divisi" error={errors.divisi_id?.[0]}>
+                            <select
+                                value={form.divisi_id}
+                                onChange={(e) => handleChange('divisi_id', e.target.value)}
+                                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
+                            >
+                                <option value="">Pilih divisi</option>
+                                {divisiList.map((d) => (
+                                    <option key={d.id} value={d.id}>
+                                        {d.nama}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+
+                        <Field label="Jabatan" error={errors.jabatan_id?.[0]}>
+                            <select
+                                value={form.jabatan_id}
+                                onChange={(e) => handleChange('jabatan_id', e.target.value)}
+                                className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
+                            >
+                                <option value="">Pilih jabatan</option>
+                                {jabatanList.map((j) => (
+                                    <option key={j.id} value={j.id}>
+                                        {j.nama}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                    </div>
+
+                    <Field label="Tanggal Masuk" error={errors.tanggal_masuk?.[0]}>
                         <input
-                            type="password"
-                            value={form.password_confirmation}
-                            onChange={(e) => handleChange('password_confirmation', e.target.value)}
+                            type="date"
+                            value={form.tanggal_masuk}
+                            onChange={(e) => handleChange('tanggal_masuk', e.target.value)}
                             className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
-                            required
                         />
+                    </Field>
+
+                    <Field label="Role" error={errors.role?.[0]}>
+                        <select
+                            value={form.role}
+                            onChange={(e) => handleChange('role', e.target.value as Role)}
+                            className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
+                        >
+                            <option value="karyawan">Karyawan</option>
+                            <option value="manajer">Manajer</option>
+                            <option value="hr">HR</option>
+                            <option value="admin">Admin</option>
+                        </select>
                     </Field>
 
                     <div className="flex justify-end gap-2 pt-2">
