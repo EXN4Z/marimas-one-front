@@ -4,8 +4,8 @@ import api from '../api/axios';
 import AppLayout from '../components/AppLayout';
 
 type Role = 'admin' | 'hr' | 'manajer' | 'karyawan';
-type Status = 'menunggu' | 'disetujui' | 'ditolak';
-type TabKey = 'semua' | 'menunggu' | 'disetujui' | 'ditolak';
+type Status = 'pending' | 'disetujui' | 'ditolak';
+type TabKey = 'semua' | 'pending' | 'disetujui' | 'ditolak';
 type JenisCuti = 'tahunan' | 'sakit' | 'izin' | 'lainnya';
 
 interface Pemohon {
@@ -26,13 +26,13 @@ interface Cuti {
 }
 
 const statusStyles: Record<Status, string> = {
-    menunggu: 'bg-yellow-50 text-yellow-700',
+    pending: 'bg-yellow-50 text-yellow-700',
     disetujui: 'bg-green-50 text-green-700',
     ditolak: 'bg-red-50 text-red-700',
 };
 
 const statusLabels: Record<Status, string> = {
-    menunggu: 'Menunggu',
+    pending: 'Menunggu',
     disetujui: 'Disetujui',
     ditolak: 'Ditolak',
 };
@@ -55,7 +55,7 @@ const tabs: { key: TabKey; label: string; icon: JSX.Element }[] = [
         ),
     },
     {
-        key: 'menunggu',
+        key: 'pending',
         label: 'Menunggu',
         icon: (
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,6 +116,7 @@ export default function CutiPage() {
 
     // Detail view state (menampilkan kolom 'alasan' beserta tombol update)
     const [detailCuti, setDetailCuti] = useState<Cuti | null>(null);
+    const [detailProcessing, setDetailProcessing] = useState<boolean>(false);
 
     useEffect(() => {
         api
@@ -151,15 +152,40 @@ export default function CutiPage() {
         });
     }, [cutiList, search, activeTab]);
 
+    const myCutiList = useMemo<Cuti[]>(() => {
+        return cutiList
+            .filter((c) => c.user.id === currentUserId)
+            .sort((a, b) => new Date(b.tanggal_mulai).getTime() - new Date(a.tanggal_mulai).getTime());
+    }, [cutiList, currentUserId]);
+
     function openModal(cuti: Cuti, action: 'setujui' | 'tolak' | 'batalkan') {
         setSelectedCuti(cuti);
         setModalAction(action);
     }
 
-    // Dipanggil dari dalam modal detail: tutup detail lalu buka konfirmasi update
-    function handleActionFromDetail(cuti: Cuti, action: 'setujui' | 'tolak' | 'batalkan') {
+    // Dipanggil dari dalam modal detail untuk "Batalkan": tutup detail lalu buka konfirmasi
+    function handleActionFromDetail(cuti: Cuti, action: 'batalkan') {
         setDetailCuti(null);
         openModal(cuti, action);
+    }
+
+    // Setujui/Tolak dari modal detail: langsung update tanpa konfirmasi tambahan
+    async function updateStatusLangsung(cuti: Cuti, status: Status) {
+        setDetailProcessing(true);
+        try {
+            await api.patch(`/cuti/${cuti.id}`, { status });
+            setCutiList((prev) => prev.map((c) => (c.id === cuti.id ? { ...c, status } : c)));
+            setDetailCuti(null);
+        } catch (err: any) {
+            if (err.response?.status === 403) {
+                setErrorMsg('Anda tidak punya akses untuk melakukan aksi ini.');
+            } else {
+                setErrorMsg('Gagal memproses pengajuan. Coba lagi.');
+            }
+            setDetailCuti(null);
+        } finally {
+            setDetailProcessing(false);
+        }
     }
 
     async function confirmAction() {
@@ -201,6 +227,10 @@ export default function CutiPage() {
                     <h1 className="text-xl font-bold text-gray-900">Pengajuan Cuti</h1>
                     <p className="text-sm text-gray-500 mt-1">Kelola dan pantau seluruh pengajuan cuti karyawan.</p>
                 </div>
+
+                {!loading && !errorMsg && myCutiList.length > 0 && (
+                    <RiwayatCutiSaya cutiList={myCutiList} />
+                )}
 
                 <div className="bg-white border border-gray-200 rounded-xl p-4">
                     <nav className="mb-4">
@@ -285,9 +315,10 @@ export default function CutiPage() {
                     cuti={detailCuti}
                     isApprover={isApprover}
                     isOwner={detailCuti.user.id === currentUserId}
+                    processing={detailProcessing}
                     onClose={() => setDetailCuti(null)}
-                    onSetujui={() => handleActionFromDetail(detailCuti, 'setujui')}
-                    onTolak={() => handleActionFromDetail(detailCuti, 'tolak')}
+                    onSetujui={() => updateStatusLangsung(detailCuti, 'disetujui')}
+                    onTolak={() => updateStatusLangsung(detailCuti, 'ditolak')}
                     onBatalkan={() => handleActionFromDetail(detailCuti, 'batalkan')}
                 />
             )}
@@ -319,8 +350,8 @@ interface CutiRowProps {
 }
 
 function CutiRow({ cuti, isApprover, isOwner, onDetail, onSetujui, onTolak, onBatalkan }: CutiRowProps) {
-    const bisaDiproses = isApprover && cuti.status === 'menunggu';
-    const bisaDibatalkan = isOwner && cuti.status === 'menunggu';
+    const bisaDiproses = isApprover && cuti.status === 'pending';
+    const bisaDibatalkan = isOwner && cuti.status === 'pending';
 
     return (
         <div className="flex items-center justify-between py-3">
@@ -370,15 +401,16 @@ interface DetailModalProps {
     cuti: Cuti;
     isApprover: boolean;
     isOwner: boolean;
+    processing: boolean;
     onClose: () => void;
     onSetujui: () => void;
     onTolak: () => void;
     onBatalkan: () => void;
 }
 
-function DetailModal({ cuti, isApprover, isOwner, onClose, onSetujui, onTolak, onBatalkan }: DetailModalProps) {
-    const bisaDiproses = isApprover && cuti.status === 'menunggu';
-    const bisaDibatalkan = isOwner && cuti.status === 'menunggu';
+function DetailModal({ cuti, isApprover, isOwner, processing, onClose, onSetujui, onTolak, onBatalkan }: DetailModalProps) {
+    const bisaDiproses = isApprover && cuti.status === 'pending';
+    const bisaDibatalkan = isOwner && cuti.status === 'pending';
 
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
@@ -432,14 +464,16 @@ function DetailModal({ cuti, isApprover, isOwner, onClose, onSetujui, onTolak, o
                 <div className="flex justify-end gap-2">
                     <button
                         onClick={onClose}
-                        className="text-sm px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+                        disabled={processing}
+                        className="text-sm px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 disabled:opacity-50"
                     >
                         Tutup
                     </button>
                     {bisaDibatalkan && (
                         <button
                             onClick={onBatalkan}
-                            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                            disabled={processing}
+                            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-50"
                         >
                             Batalkan
                         </button>
@@ -448,19 +482,58 @@ function DetailModal({ cuti, isApprover, isOwner, onClose, onSetujui, onTolak, o
                         <>
                             <button
                                 onClick={onTolak}
-                                className="text-sm px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700"
+                                disabled={processing}
+                                className="text-sm px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700 disabled:opacity-50"
                             >
-                                Tolak
+                                {processing ? 'Memproses...' : 'Tolak'}
                             </button>
                             <button
                                 onClick={onSetujui}
-                                className="text-sm px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700"
+                                disabled={processing}
+                                className="text-sm px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700 disabled:opacity-50"
                             >
-                                Setujui
+                                {processing ? 'Memproses...' : 'Setujui'}
                             </button>
                         </>
                     )}
                 </div>
+            </div>
+        </div>
+    );
+}
+
+interface RiwayatCutiSayaProps {
+    cutiList: Cuti[];
+}
+
+const riwayatHint: Record<Status, string> = {
+    pending: 'Masih menunggu keputusan atasan.',
+    disetujui: 'Cuti kamu disetujui.',
+    ditolak: 'Cuti kamu ditolak.',
+};
+
+function RiwayatCutiSaya({ cutiList }: RiwayatCutiSayaProps) {
+    return (
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-gray-900">Riwayat Cuti Saya</h2>
+                <span className="text-xs text-gray-400">{cutiList.length} pengajuan</span>
+            </div>
+            <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
+                {cutiList.map((cuti) => (
+                    <div key={cuti.id} className="flex items-center justify-between py-2.5">
+                        <div>
+                            <p className="text-sm text-gray-900">{jenisLabels[cuti.jenis_cuti]}</p>
+                            <p className="text-xs text-gray-500">
+                                {formatTanggal(cuti.tanggal_mulai)} - {formatTanggal(cuti.tanggal_selesai)} · {cuti.jumlah_hari} hari
+                            </p>
+                            <p className="text-xs text-gray-400 mt-0.5">{riwayatHint[cuti.status]}</p>
+                        </div>
+                        <span className={`text-xs px-3 py-1 rounded-full shrink-0 ${statusStyles[cuti.status]}`}>
+                            {statusLabels[cuti.status]}
+                        </span>
+                    </div>
+                ))}
             </div>
         </div>
     );
