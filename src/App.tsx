@@ -12,6 +12,7 @@ import KaryawanEdit from './pages/KaryawanEdit';
 import KaryawanCreate from './pages/KaryawanCreate';
 import Absensi from './pages/Absensi';
 import AiAssistant from './pages/AiAssistant';
+import AuditLog from './pages/AuditLog';
 
 function App() {
   return (
@@ -38,11 +39,13 @@ function App() {
               element={
                 <AdminRoute>
                   <KaryawanCreate />
+                  <AuditLog />
                 </AdminRoute>
               }
             />
             <Route path="/absensi" element={<Absensi />} />
             <Route path="/ai-assistant" element={<AiAssistant />} />
+            <Route path="/audit-log" element={<AuditLog />} />
             <Route path="/" element={<Login />} />
           </Routes>
         </BrowserRouter>

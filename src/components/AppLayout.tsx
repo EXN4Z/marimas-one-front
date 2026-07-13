@@ -38,7 +38,7 @@ const navItems: NavItem[] = [
   { label: 'Inventaris', icon: Package, path: '/inventaris' },
   { label: 'Dashboard Analytics', icon: BarChart3, path: null },
   { label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
-  { label: 'Audit Log', icon: ScrollText, path: null },
+  { label: 'Audit Log', icon: ScrollText, path: '/audit-log' },
   { label: 'Settings', icon: SettingsIcon, path: null },
 ];
 
