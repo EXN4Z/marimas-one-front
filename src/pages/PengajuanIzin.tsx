@@ -9,7 +9,7 @@ type TabKey = 'semua' | 'pending' | 'disetujui' | 'ditolak';
 type JenisIzin = 'pribadi' | 'sakit' | 'terlambat' | 'pulang_cepat' | 'dinas' | 'lainnya';
 
 // Backend hardcode base URL yang sama dengan axios.ts, dipakai buat link bukti izin
-const STORAGE_BASE_URL = 'http://localhost:8000/storage/';
+const STORAGE_BASE_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000') + '/storage/';
 
 interface Pemohon {
     id: number;
