@@ -82,13 +82,26 @@ const upcomingEvents = [
   { title: 'Training AI Assistant', date: 'Jumat, 13:00' },
 ];
 // ================================================================
+interface departemenDistribusi {
+  departemen: string;
+  jumlah: number;
+}
 
 export default function Dashboard() {
   const { setUser } = useAuth();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [departemen, setDepartemen] = useState<departemenDistribusi[]>([])
 
   useEffect(() => {
+    api.get('/dashboard/kpd')
+    .then((res) => {
+        console.log("BERHASIL", res.data);
+        setDepartemen(res.data);
+    })
+    .catch((err) => {
+        console.log(err.response);
+    });
     let mounted = true;
     const fetchUser = async () => {
       try {
@@ -128,7 +141,7 @@ export default function Dashboard() {
 
   return (
     <AppLayout title="Dashboard">
-      <DashboardContent error={error} getGreeting={getGreeting} />
+      <DashboardContent error={error} getGreeting={getGreeting} departemen={departemen} />
       <ChatWidget />
     </AppLayout>
   );
@@ -137,9 +150,11 @@ export default function Dashboard() {
 function DashboardContent({
   error,
   getGreeting,
+  departemen,
 }: {
   error: string | null;
   getGreeting: () => string;
+  departemen: departemenDistribusi[];
 }) {
   const { user } = useAuth();
 
@@ -207,10 +222,10 @@ function DashboardContent({
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={divisiDistribusi} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
+              <BarChart data={departemen} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
                 <XAxis type="number" tick={{ fontSize: 12, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <YAxis dataKey="divisi" type="category" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} width={70} />
+                <YAxis dataKey="departemen" type="category" tick={{ fontSize: 12, fill: '#475569' }} axisLine={false} tickLine={false} width={70} />
                 <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
                 <Bar dataKey="jumlah" fill="#2563eb" radius={[0, 4, 4, 0]} />
               </BarChart>
