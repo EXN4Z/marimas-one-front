@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   { label: 'Pengajuan Izin', icon: FileText, path: '/izin' },
   { label: 'Ticketing', icon: Ticket, path: '/ticketing' },
   { label: 'Inventaris', icon: Package, path: '/inventaris' },
-  { label: 'Dashboard Analytics', icon: BarChart3, path: null },
+  { label: 'Dashboard Analytics', icon: BarChart3, path: '/dashboard-analytics' },
   { label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
   { label: 'Audit Log', icon: ScrollText, path: '/audit-log' },
   { label: 'Settings', icon: SettingsIcon, path: '/settings' },
@@ -63,6 +63,15 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
+
+  const visibleNavItems = navItems.filter((item) => {
+  // Audit Log hanya untuk admin
+  if (item.label === 'Audit Log' && user?.role !== 'admin') {
+    return false;
+  }
+
+  return true;
+  });
 
   const handleLogout = async () => {
     try {
@@ -109,7 +118,7 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
         </div>
 
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.path === location.pathname;
             const isDisabled = !item.path;
