@@ -10,10 +10,7 @@ import Karyawan from './pages/Karyawan';
 import KaryawanEdit from './pages/KaryawanEdit';
 import KaryawanCreate from './pages/KaryawanCreate';
 import Absensi from './pages/Absensi';
-<<<<<<< HEAD
 import AiAssistant from './pages/AiAssistant';
-=======
->>>>>>> ba78c7acb647a89d11ac381741e493d3bb49f280
 
 function App() {
   return (
@@ -43,10 +40,7 @@ function App() {
             }
           />
           <Route path="/absensi" element={<Absensi />} />
-<<<<<<< HEAD
           <Route path="/ai-assistant" element={<AiAssistant />} />
-=======
->>>>>>> ba78c7acb647a89d11ac381741e493d3bb49f280
           <Route path="/" element={<Login />} />
         </Routes>
       </BrowserRouter>
