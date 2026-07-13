@@ -39,7 +39,7 @@ const navItems: NavItem[] = [
   { label: 'Dashboard Analytics', icon: BarChart3, path: null },
   { label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
   { label: 'Audit Log', icon: ScrollText, path: '/audit-log' },
-  { label: 'Settings', icon: SettingsIcon, path: null },
+  { label: 'Settings', icon: SettingsIcon, path: '/settings' },
 ];
 
 function initials(name?: string) {
