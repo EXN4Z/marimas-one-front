@@ -366,7 +366,7 @@ export default function DashboardAnalyticsPage() {
                                     tickFormatter={(v: number) => formatRupiahSingkat(v)}
                                     width={48}
                                 />
-                                <Tooltip contentStyle={chartTooltipStyle} formatter={(v: number) => formatRupiah(v)} />
+                                <Tooltip contentStyle={chartTooltipStyle} formatter={(value) => formatRupiah(Number(value ?? 0))} />
                                 <Legend wrapperStyle={{ fontSize: 12 }} />
                                 <Line type="monotone" dataKey="pemasukan" name="Pemasukan" stroke="#16A34A" strokeWidth={2} dot={{ r: 3 }} />
                                 <Line type="monotone" dataKey="pengeluaran" name="Pengeluaran" stroke="#DC2626" strokeWidth={2} dot={{ r: 3 }} />

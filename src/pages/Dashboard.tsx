@@ -12,14 +12,11 @@ import {
   Area,
   BarChart,
   Bar,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   CartesianGrid,
-  Legend,
 } from 'recharts';
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/Chatwidget';
@@ -43,15 +40,6 @@ const attendanceTrend = [
   { day: 'Jum', hadir: 45, target: 45 },
   { day: 'Sab', hadir: 12, target: 15 },
   { day: 'Min', hadir: 5, target: 10 },
-];
-
-const pengajuanTrend = [
-  { bulan: 'Jan', cuti: 8, izin: 4 },
-  { bulan: 'Feb', cuti: 6, izin: 5 },
-  { bulan: 'Mar', cuti: 10, izin: 3 },
-  { bulan: 'Apr', cuti: 7, izin: 6 },
-  { bulan: 'Mei', cuti: 12, izin: 4 },
-  { bulan: 'Jun', cuti: 9, izin: 7 },
 ];
 
 const divisiDistribusi = [
