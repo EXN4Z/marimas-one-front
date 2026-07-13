@@ -142,7 +142,7 @@ export default function CutiPage() {
         const q = search.toLowerCase().trim();
         return cutiList.filter((c) => {
             const matchSearch =
-                c.user.name.toLowerCase().includes(q) || c.alasan.toLowerCase().includes(q);
+                (c.user.name ?? '').toLowerCase().includes(q) || c.alasan.toLowerCase().includes(q);
             const matchTab = activeTab === 'semua' || c.status === activeTab;
             return matchSearch && matchTab;
         });
@@ -308,7 +308,7 @@ function CutiRow({ cuti, isApprover, isOwner, onSetujui, onTolak, onBatalkan }: 
                 <div>
                     <p className="text-sm font-medium text-gray-900">{cuti.user.name}</p>
                     <p className="text-xs text-gray-500">
-                        {formatTanggal(cuti.tanggal_mulai)} - {formatTanggal(cuti.tanggal_selesai)} · {cuti.jumlah_hari} hari
+                        {formatTanggal(cuti.tanggal_mulai)} - {formatTanggal(cuti.tanggal_selesai)}
                     </p>
                 </div>
             </div>

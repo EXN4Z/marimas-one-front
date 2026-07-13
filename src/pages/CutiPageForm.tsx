@@ -80,6 +80,7 @@ export default function CutiFormPage() {
 
         setSubmitting(true);
         try {
+            console.log("KIRIM DEBUG");
             await api.post('/cuti/create', {
                 tanggal_mulai: form.tanggal_mulai,
                 tanggal_selesai: form.tanggal_selesai,
@@ -87,6 +88,7 @@ export default function CutiFormPage() {
             });
             navigate('/cuti');
         } catch (err: any) {
+            console.log('DEBUG error response:', err.response?.data);
             if (err.response?.status === 422 && err.response.data?.errors) {
                 const apiErrors = err.response.data.errors as Record<string, string[]>;
                 setErrors({
