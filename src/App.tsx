@@ -12,6 +12,8 @@ import KaryawanEdit from './pages/KaryawanEdit';
 import KaryawanCreate from './pages/KaryawanCreate';
 import Absensi from './pages/Absensi';
 import AiAssistant from './pages/AiAssistant';
+import Ticketing from './pages/Ticketing';
+import AuditLog from './pages/AuditLog';
 
 function App() {
   return (
