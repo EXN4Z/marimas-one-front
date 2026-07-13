@@ -11,11 +11,43 @@ import Karyawan from './pages/Karyawan';
 import KaryawanEdit from './pages/KaryawanEdit';
 import KaryawanCreate from './pages/KaryawanCreate';
 import Absensi from './pages/Absensi';
+import PengajuanCuti from './pages/PengajuanCuti';
+import CutiForm from './pages/CutiPageForm';
 import AiAssistant from './pages/AiAssistant';
 
 function App() {
   return (
     <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/verify-otp" element={<VerifyOtp />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/inventaris" element={<Inventaris />} />
+          <Route path="/karyawan" element={<Karyawan />} />
+          <Route path="/cuti" element={<PengajuanCuti />} />
+          <Route path="/cuti/create" element={<CutiForm />} />
+          <Route
+            path="/karyawan/:id/edit"
+            element={
+              <AdminRoute>
+                <KaryawanEdit />
+              </AdminRoute>
+            }
+          />
+          <Route
+            path="/karyawan/create"
+            element={
+              <AdminRoute>
+                <KaryawanCreate />
+              </AdminRoute>
+            }
+          />
+          <Route path="/absensi" element={<Absensi />} />
+          <Route path="/" element={<Login />} />
+        </Routes>
+      </BrowserRouter>
       <ChatProvider>
         <BrowserRouter>
           <Routes>
