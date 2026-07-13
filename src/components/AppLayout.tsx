@@ -34,7 +34,7 @@ const navItems: NavItem[] = [
   { label: 'Absensi QR', icon: QrCode, path: '/absensi' },
   { label: 'Pengajuan Cuti', icon: CalendarDays, path: null },
   { label: 'Pengajuan Izin', icon: FileText, path: null },
-  { label: 'Ticketing', icon: Ticket, path: null },
+  { label: 'Ticketing', icon: Ticket, path: '/ticketing' },
   { label: 'Inventaris', icon: Package, path: '/inventaris' },
   { label: 'Dashboard Analytics', icon: BarChart3, path: null },
   { label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },

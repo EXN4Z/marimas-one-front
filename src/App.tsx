@@ -12,6 +12,7 @@ import KaryawanEdit from './pages/KaryawanEdit';
 import KaryawanCreate from './pages/KaryawanCreate';
 import Absensi from './pages/Absensi';
 import AiAssistant from './pages/AiAssistant';
+import Ticketing from './pages/Ticketing';
 
 function App() {
   return (
@@ -42,6 +43,7 @@ function App() {
               }
             />
             <Route path="/absensi" element={<Absensi />} />
+            <Route path="/ticketing" element={<Ticketing />} />
             <Route path="/ai-assistant" element={<AiAssistant />} />
             <Route path="/" element={<Login />} />
           </Routes>
