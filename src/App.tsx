@@ -10,6 +10,8 @@ import Karyawan from './pages/Karyawan';
 import KaryawanEdit from './pages/KaryawanEdit';
 import KaryawanCreate from './pages/KaryawanCreate';
 import Absensi from './pages/Absensi';
+import PengajuanCuti from './pages/PengajuanCuti';
+import CutiForm from './pages/CutiPageForm';
 
 function App() {
   return (
@@ -22,6 +24,8 @@ function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/inventaris" element={<Inventaris />} />
           <Route path="/karyawan" element={<Karyawan />} />
+          <Route path="/cuti" element={<PengajuanCuti />} />
+          <Route path="/cuti/create" element={<CutiForm />} />
           <Route
             path="/karyawan/:id/edit"
             element={
