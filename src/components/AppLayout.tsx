@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   { label: 'Pengajuan Izin', icon: FileText, path: null },
   { label: 'Ticketing', icon: Ticket, path: '/ticketing' },
   { label: 'Inventaris', icon: Package, path: '/inventaris' },
-  { label: 'Dashboard Analytics', icon: BarChart3, path: null },
+  { label: 'Dashboard Analytics', icon: BarChart3, path: '/dashboard-analytics' },
   { label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
   { label: 'Audit Log', icon: ScrollText, path: '/audit-log' },
   { label: 'Settings', icon: SettingsIcon, path: '/settings' },
