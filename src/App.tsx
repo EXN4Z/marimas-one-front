@@ -17,6 +17,8 @@ import Settings from './pages/Settings';
 import AuditLog from './pages/AuditLog';
 import PengajuanCuti from './pages/PengajuanCuti';
 import CutiForm from './pages/CutiPageForm';
+import PengajuanIzin from './pages/PengajuanIzin';
+import IzinForm from './pages/IzinPageForm';
 
 function App() {
   return (
@@ -32,6 +34,8 @@ function App() {
             <Route path="/karyawan" element={<Karyawan />} />
             <Route path="/cuti" element={<PengajuanCuti />} />
             <Route path="/cuti/create" element={<CutiForm />} />
+            <Route path="/izin" element={<PengajuanIzin />} />
+            <Route path="/izin/create" element={<IzinForm />} />
             <Route
               path="/karyawan/:id/edit"
               element={

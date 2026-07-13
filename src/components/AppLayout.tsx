@@ -33,7 +33,7 @@ const navItems: NavItem[] = [
   { label: 'Data Karyawan', icon: Users, path: '/karyawan' },
   { label: 'Absensi QR', icon: QrCode, path: '/absensi' },
   { label: 'Pengajuan Cuti', icon: CalendarDays, path: '/cuti' },
-  { label: 'Pengajuan Izin', icon: FileText, path: null },
+  { label: 'Pengajuan Izin', icon: FileText, path: '/izin' },
   { label: 'Ticketing', icon: Ticket, path: '/ticketing' },
   { label: 'Inventaris', icon: Package, path: '/inventaris' },
   { label: 'Dashboard Analytics', icon: BarChart3, path: null },
