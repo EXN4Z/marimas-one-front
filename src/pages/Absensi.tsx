@@ -331,7 +331,7 @@ export default function AbsensiPage() {
                         )}
                       </div>
                       <p className="text-xs text-slate-400">
-                        {item.nip} · {roleLabels[item.user.role]} · {item.divisi?.nama || '-'}
+                        {item.nip} · {roleLabels[item.user.role]} · {item.departemen?.nama || '-'}
                       </p>
                     </div>
                   </div>

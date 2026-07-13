@@ -2,15 +2,16 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import api from '../api/axios';
 import AppLayout from '../components/AppLayout';
-import { getDivisi, type Divisi } from '../api/divisi';
+import { getDepartemen } from '../api/departemen';
 import { getJabatan, type Jabatan } from '../api/jabatan';
+import type { Departemen } from '../api/departemen';
 
 type Role = 'admin' | 'hr' | 'manajer' | 'karyawan';
 
 interface Pekerja {
     id: number;
     nip: string;
-    divisi_id: number | null;
+    departemen_id: number | null;
     jabatan_id: number | null;
     tanggal_masuk: string | null;
 }
@@ -30,7 +31,7 @@ interface FormState {
     phone: string;
     role: Role;
     nip: string;
-    divisi_id: string;
+    departemen_id: string;
     jabatan_id: string;
     tanggal_masuk: string;
 }
@@ -45,7 +46,7 @@ const initialForm: FormState = {
     phone: '',
     role: 'karyawan',
     nip: '',
-    divisi_id: '',
+    departemen_id: '',
     jabatan_id: '',
     tanggal_masuk: '',
 };
@@ -55,7 +56,7 @@ export default function EditKaryawanPage() {
     const navigate = useNavigate();
 
     const [form, setForm] = useState<FormState>(initialForm);
-    const [divisiList, setDivisiList] = useState<Divisi[]>([]);
+    const [departemenList, setDepartemenList] = useState<Departemen[]>([]);
     const [jabatanList, setJabatanList] = useState<Jabatan[]>([]);
     const [loading, setLoading] = useState<boolean>(true);
     const [saving, setSaving] = useState<boolean>(false);
@@ -63,7 +64,7 @@ export default function EditKaryawanPage() {
     const [errorMsg, setErrorMsg] = useState<string>('');
 
     useEffect(() => {
-        getDivisi().then(setDivisiList).catch(() => {});
+        getDepartemen().then(setDepartemenList).catch(() => {});
         getJabatan().then(setJabatanList).catch(() => {});
 
         api
@@ -76,7 +77,7 @@ export default function EditKaryawanPage() {
                     phone: u.phone ?? '',
                     role: u.role,
                     nip: u.pekerja?.nip ?? '',
-                    divisi_id: u.pekerja?.divisi_id ? String(u.pekerja.divisi_id) : '',
+                    departemen_id: u.pekerja?.departemen_id ? String(u.pekerja.departemen_id) : '',
                     jabatan_id: u.pekerja?.jabatan_id ? String(u.pekerja.jabatan_id) : '',
                     tanggal_masuk: u.pekerja?.tanggal_masuk ?? '',
                 });
@@ -107,7 +108,7 @@ export default function EditKaryawanPage() {
         try {
             const payload = {
                 ...form,
-                divisi_id: form.divisi_id || null,
+                departemen_id: form.departemen_id || null,
                 jabatan_id: form.jabatan_id || null,
                 tanggal_masuk: form.tanggal_masuk || null,
             };
@@ -205,14 +206,14 @@ export default function EditKaryawanPage() {
                     </Field>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <Field label="Divisi" error={errors.divisi_id?.[0]}>
+                        <Field label="Departemen" error={errors.departemen_id?.[0]}>
                             <select
-                                value={form.divisi_id}
-                                onChange={(e) => handleChange('divisi_id', e.target.value)}
+                                value={form.departemen_id}
+                                onChange={(e) => handleChange('departemen_id', e.target.value)}
                                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
                             >
-                                <option value="">Pilih divisi</option>
-                                {divisiList.map((d) => (
+                                <option value="">Pilih departemen</option>
+                                {departemenList.map((d) => (
                                     <option key={d.id} value={d.id}>
                                         {d.nama}
                                     </option>

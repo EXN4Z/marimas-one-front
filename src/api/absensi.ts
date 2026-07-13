@@ -11,7 +11,7 @@ export interface Karyawan {
     name: string;
     role: Role;
   };
-  divisi: { nama: string } | null;
+  departemen: { nama: string } | null;
   jabatan: { nama: string } | null;
 }
 

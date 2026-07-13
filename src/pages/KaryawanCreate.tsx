@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import AppLayout from '../components/AppLayout';
-import { getDivisi, type Divisi } from '../api/divisi';
+import { getDepartemen, type Departemen } from '../api/departemen';
 import { getJabatan, type Jabatan } from '../api/jabatan';
 
 type Role = 'admin' | 'hr' | 'manajer' | 'karyawan';
@@ -13,7 +13,7 @@ interface FormState {
     phone: string;
     role: Role;
     nip: string;
-    divisi_id: string;
+    departemen_id: string;
     jabatan_id: string;
     tanggal_masuk: string;
 }
@@ -28,7 +28,7 @@ const initialForm: FormState = {
     phone: '',
     role: 'karyawan',
     nip: '',
-    divisi_id: '',
+    departemen_id: '',
     jabatan_id: '',
     tanggal_masuk: '',
 };
@@ -37,7 +37,7 @@ export default function CreateKaryawanPage() {
     const navigate = useNavigate();
 
     const [form, setForm] = useState<FormState>(initialForm);
-    const [divisiList, setDivisiList] = useState<Divisi[]>([]);
+    const [departemenList, setDepartemenList] = useState<Departemen[]>([]);
     const [jabatanList, setJabatanList] = useState<Jabatan[]>([]);
     const [saving, setSaving] = useState<boolean>(false);
     const [errors, setErrors] = useState<FieldErrors>({});
@@ -47,7 +47,7 @@ export default function CreateKaryawanPage() {
     const [createdName, setCreatedName] = useState<string>('');
 
     useEffect(() => {
-        getDivisi().then(setDivisiList).catch(() => {});
+        getDepartemen().then(setDepartemenList).catch(() => {});
         getJabatan().then(setJabatanList).catch(() => {});
     }, []);
 
@@ -71,7 +71,7 @@ export default function CreateKaryawanPage() {
         try {
             const payload = {
                 ...form,
-                divisi_id: form.divisi_id || null,
+                departemen_id: form.departemen_id || null,
                 jabatan_id: form.jabatan_id || null,
                 tanggal_masuk: form.tanggal_masuk || null,
             };
@@ -178,14 +178,14 @@ export default function CreateKaryawanPage() {
                     </Field>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <Field label="Divisi" error={errors.divisi_id?.[0]}>
+                        <Field label="Departemen" error={errors.departemen_id?.[0]}>
                             <select
-                                value={form.divisi_id}
-                                onChange={(e) => handleChange('divisi_id', e.target.value)}
+                                value={form.departemen_id}
+                                onChange={(e) => handleChange('departemen_id', e.target.value)}
                                 className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-black/10"
                             >
-                                <option value="">Pilih divisi</option>
-                                {divisiList.map((d) => (
+                                <option value="">Pilih departemen</option>
+                                {departemenList.map((d) => (
                                     <option key={d.id} value={d.id}>
                                         {d.nama}
                                     </option>

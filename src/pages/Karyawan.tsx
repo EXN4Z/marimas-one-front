@@ -8,7 +8,7 @@ type TabKey = 'semua' | 'karyawan' | 'hr_manajer' | 'admin';
 
 interface Pekerja {
     nip: string;
-    divisi: { nama: string } | null;
+    departemen: { nama: string } | null;
     jabatan: { nama: string } | null;
 }
 
@@ -268,7 +268,7 @@ function UserRow({ user, isAdmin, onDelete, onEdit }: UserRowProps) {
                 </span>
                 {user.pekerja && (
                     <span className="text-xs text-gray-500">
-                        {user.pekerja.divisi?.nama || 'Divisi tidak ditentukan'}
+                        {user.pekerja.departemen?.nama || 'Departemen tidak ditentukan'}
                     </span>
                 )}
                 {isAdmin && (
