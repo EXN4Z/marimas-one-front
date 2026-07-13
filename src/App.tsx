@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
+import { ChatProvider } from './context/ChatContext';
 import AdminRoute from './components/AdminRoute';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -15,35 +16,37 @@ import AiAssistant from './pages/AiAssistant';
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/verify-otp" element={<VerifyOtp />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/inventaris" element={<Inventaris />} />
-          <Route path="/karyawan" element={<Karyawan />} />
-          <Route
-            path="/karyawan/:id/edit"
-            element={
-              <AdminRoute>
-                <KaryawanEdit />
-              </AdminRoute>
-            }
-          />
-          <Route
-            path="/karyawan/create"
-            element={
-              <AdminRoute>
-                <KaryawanCreate />
-              </AdminRoute>
-            }
-          />
-          <Route path="/absensi" element={<Absensi />} />
-          <Route path="/ai-assistant" element={<AiAssistant />} />
-          <Route path="/" element={<Login />} />
-        </Routes>
-      </BrowserRouter>
+      <ChatProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/verify-otp" element={<VerifyOtp />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/inventaris" element={<Inventaris />} />
+            <Route path="/karyawan" element={<Karyawan />} />
+            <Route
+              path="/karyawan/:id/edit"
+              element={
+                <AdminRoute>
+                  <KaryawanEdit />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="/karyawan/create"
+              element={
+                <AdminRoute>
+                  <KaryawanCreate />
+                </AdminRoute>
+              }
+            />
+            <Route path="/absensi" element={<Absensi />} />
+            <Route path="/ai-assistant" element={<AiAssistant />} />
+            <Route path="/" element={<Login />} />
+          </Routes>
+        </BrowserRouter>
+      </ChatProvider>
     </AuthProvider>
   );
 }

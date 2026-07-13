@@ -2,15 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Bot, Send, Sparkles, Trash2 } from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import { useAuth } from '../context/AuthContext';
+import { useChat } from '../context/ChatContext';
 import { sendChatMessage } from '../api/chat';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  text: string;
-  time: string;
-  error?: boolean;
-}
 
 const SUGGESTIONS = [
   'Berapa total karyawan di perusahaan?',
@@ -35,14 +28,7 @@ function initials(name?: string) {
 
 export default function AiAssistant() {
   const { user } = useAuth();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'welcome',
-      role: 'assistant',
-      text: `Halo${user?.name ? `, ${user.name}` : ''}! Saya AI Assistant Marimas ONE. Tanyakan apa saja seputar absensi, data karyawan, atau inventaris.`,
-      time: now(),
-    },
-  ]);
+  const { messages, setMessages, resetChat } = useChat();
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -63,9 +49,9 @@ export default function AiAssistant() {
     const text = (overrideText ?? input).trim();
     if (!text || loading) return;
 
-    const userMessage: Message = {
+    const userMessage = {
       id: crypto.randomUUID(),
-      role: 'user',
+      role: 'user' as const,
       text,
       time: now(),
     };
@@ -105,14 +91,7 @@ export default function AiAssistant() {
   };
 
   const handleClear = () => {
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'assistant',
-        text: 'Riwayat percakapan sudah dibersihkan. Ada yang bisa saya bantu?',
-        time: now(),
-      },
-    ]);
+    resetChat();
   };
 
   return (

@@ -19,6 +19,7 @@ import {
   Package,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useChat } from '../context/ChatContext';
 import api from '../api/axios';
 
 interface NavItem {
@@ -58,6 +59,7 @@ interface AppLayoutProps {
 
 export default function AppLayout({ title, children }: AppLayoutProps) {
   const { user, logout } = useAuth();
+  const { resetChat } = useChat();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -68,6 +70,7 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
     } catch (err) {
       console.error('Logout di server gagal, lanjut clear session lokal.', err);
     } finally {
+      resetChat();
       logout();
     }
   };
