@@ -64,6 +64,15 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const visibleNavItems = navItems.filter((item) => {
+  // Audit Log hanya untuk admin
+  if (item.label === 'Audit Log' && user?.role !== 'admin') {
+    return false;
+  }
+
+  return true;
+  });
+
   const handleLogout = async () => {
     try {
       await api.post('/logout');
@@ -109,7 +118,7 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
         </div>
 
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
-          {navItems.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.path === location.pathname;
             const isDisabled = !item.path;
