@@ -36,7 +36,11 @@ const navItems: NavItem[] = [
   { label: 'Ticketing', icon: Ticket, path: null },
   { label: 'Inventaris', icon: Package, path: '/inventaris' },
   { label: 'Dashboard Analytics', icon: BarChart3, path: null },
+<<<<<<< HEAD
   { label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
+=======
+  { label: 'AI Assistant', icon: Bot, path: null },
+>>>>>>> ba78c7acb647a89d11ac381741e493d3bb49f280
   { label: 'Audit Log', icon: ScrollText, path: null },
   { label: 'Settings', icon: SettingsIcon, path: null },
 ];
