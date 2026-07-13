@@ -13,6 +13,7 @@ import KaryawanCreate from './pages/KaryawanCreate';
 import Absensi from './pages/Absensi';
 import AiAssistant from './pages/AiAssistant';
 import Ticketing from './pages/Ticketing';
+import Settings from './pages/Settings';
 import AuditLog from './pages/AuditLog';
 import PengajuanCuti from './pages/PengajuanCuti';
 import CutiForm from './pages/CutiPageForm';
@@ -50,6 +51,7 @@ function App() {
             />
             <Route path="/absensi" element={<Absensi />} />
             <Route path="/ticketing" element={<Ticketing />} />
+            <Route path="/settings" element={<Settings />} />
             <Route path="/ai-assistant" element={<AiAssistant />} />
             <Route path="/audit-log" element={<AuditLog />} />
             <Route path="/" element={<Login />} />

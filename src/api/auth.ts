@@ -36,3 +36,21 @@ export const resendOtp = async (registration_id: string): Promise<{ message: str
   const res = await api.post('/resend-otp', { registration_id });
   return res.data;
 };
+
+export const updateProfile = async (payload: {
+  name: string;
+  email?: string;
+  phone?: string;
+}): Promise<User> => {
+  const res = await api.put<User>('/profile', payload);
+  return res.data;
+};
+
+export const changePassword = async (payload: {
+  current_password: string;
+  password: string;
+  password_confirmation: string;
+}): Promise<{ message: string }> => {
+  const res = await api.put('/change-password', payload);
+  return res.data;
+};
