@@ -72,6 +72,7 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
     } finally {
       resetChat();
       logout();
+      navigate('/login', { replace: true });
     }
   };
 
