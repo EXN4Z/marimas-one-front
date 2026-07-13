@@ -114,6 +114,9 @@ export default function CutiPage() {
     const [modalAction, setModalAction] = useState<'setujui' | 'tolak' | 'batalkan' | null>(null);
     const [processing, setProcessing] = useState<boolean>(false);
 
+    // Detail view state (menampilkan kolom 'alasan' beserta tombol update)
+    const [detailCuti, setDetailCuti] = useState<Cuti | null>(null);
+
     useEffect(() => {
         api
             .get<{ id: number; role: Role }>('/user')
@@ -151,6 +154,12 @@ export default function CutiPage() {
     function openModal(cuti: Cuti, action: 'setujui' | 'tolak' | 'batalkan') {
         setSelectedCuti(cuti);
         setModalAction(action);
+    }
+
+    // Dipanggil dari dalam modal detail: tutup detail lalu buka konfirmasi update
+    function handleActionFromDetail(cuti: Cuti, action: 'setujui' | 'tolak' | 'batalkan') {
+        setDetailCuti(null);
+        openModal(cuti, action);
     }
 
     async function confirmAction() {
@@ -260,6 +269,7 @@ export default function CutiPage() {
                                     cuti={cuti}
                                     isApprover={isApprover}
                                     isOwner={cuti.user.id === currentUserId}
+                                    onDetail={() => setDetailCuti(cuti)}
                                     onSetujui={() => openModal(cuti, 'setujui')}
                                     onTolak={() => openModal(cuti, 'tolak')}
                                     onBatalkan={() => openModal(cuti, 'batalkan')}
@@ -269,6 +279,18 @@ export default function CutiPage() {
                     )}
                 </div>
             </div>
+
+            {detailCuti && (
+                <DetailModal
+                    cuti={detailCuti}
+                    isApprover={isApprover}
+                    isOwner={detailCuti.user.id === currentUserId}
+                    onClose={() => setDetailCuti(null)}
+                    onSetujui={() => handleActionFromDetail(detailCuti, 'setujui')}
+                    onTolak={() => handleActionFromDetail(detailCuti, 'tolak')}
+                    onBatalkan={() => handleActionFromDetail(detailCuti, 'batalkan')}
+                />
+            )}
 
             {selectedCuti && modalAction && (
                 <ConfirmActionModal
@@ -290,12 +312,13 @@ interface CutiRowProps {
     cuti: Cuti;
     isApprover: boolean;
     isOwner: boolean;
+    onDetail: () => void;
     onSetujui: () => void;
     onTolak: () => void;
     onBatalkan: () => void;
 }
 
-function CutiRow({ cuti, isApprover, isOwner, onSetujui, onTolak, onBatalkan }: CutiRowProps) {
+function CutiRow({ cuti, isApprover, isOwner, onDetail, onSetujui, onTolak, onBatalkan }: CutiRowProps) {
     const bisaDiproses = isApprover && cuti.status === 'menunggu';
     const bisaDibatalkan = isOwner && cuti.status === 'menunggu';
 
@@ -317,6 +340,12 @@ function CutiRow({ cuti, isApprover, isOwner, onSetujui, onTolak, onBatalkan }: 
                 <span className={`text-xs px-3 py-1 rounded-full ${statusStyles[cuti.status]}`}>
                     {statusLabels[cuti.status]}
                 </span>
+                <button
+                    onClick={onDetail}
+                    className="text-xs text-gray-600 hover:text-black border border-gray-200 rounded-lg px-3 py-1"
+                >
+                    Detail
+                </button>
                 {bisaDiproses && (
                     <>
                         <button onClick={onSetujui} className="text-xs text-green-600 hover:text-green-700">
@@ -332,6 +361,106 @@ function CutiRow({ cuti, isApprover, isOwner, onSetujui, onTolak, onBatalkan }: 
                         Batalkan
                     </button>
                 )}
+            </div>
+        </div>
+    );
+}
+
+interface DetailModalProps {
+    cuti: Cuti;
+    isApprover: boolean;
+    isOwner: boolean;
+    onClose: () => void;
+    onSetujui: () => void;
+    onTolak: () => void;
+    onBatalkan: () => void;
+}
+
+function DetailModal({ cuti, isApprover, isOwner, onClose, onSetujui, onTolak, onBatalkan }: DetailModalProps) {
+    const bisaDiproses = isApprover && cuti.status === 'menunggu';
+    const bisaDibatalkan = isOwner && cuti.status === 'menunggu';
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-xl w-full max-w-md p-5">
+                <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-xs font-medium text-gray-700">
+                            {initials(cuti.user.name)}
+                        </div>
+                        <div>
+                            <p className="text-sm font-medium text-gray-900">{cuti.user.name}</p>
+                            <p className="text-xs text-gray-500">{cuti.user.email}</p>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div className="space-y-3 mb-5">
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Status</span>
+                        <span className={`text-xs px-3 py-1 rounded-full ${statusStyles[cuti.status]}`}>
+                            {statusLabels[cuti.status]}
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Jenis Cuti</span>
+                        <span className="text-sm text-gray-900">{jenisLabels[cuti.jenis_cuti]}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Tanggal</span>
+                        <span className="text-sm text-gray-900">
+                            {formatTanggal(cuti.tanggal_mulai)} - {formatTanggal(cuti.tanggal_selesai)}
+                        </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-500">Jumlah Hari</span>
+                        <span className="text-sm text-gray-900">{cuti.jumlah_hari} hari</span>
+                    </div>
+                    <div>
+                        <span className="text-xs text-gray-500">Alasan</span>
+                        <p className="text-sm text-gray-900 mt-1 whitespace-pre-wrap bg-gray-50 border border-gray-100 rounded-lg p-3">
+                            {cuti.alasan}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                    <button
+                        onClick={onClose}
+                        className="text-sm px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+                    >
+                        Tutup
+                    </button>
+                    {bisaDibatalkan && (
+                        <button
+                            onClick={onBatalkan}
+                            className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50"
+                        >
+                            Batalkan
+                        </button>
+                    )}
+                    {bisaDiproses && (
+                        <>
+                            <button
+                                onClick={onTolak}
+                                className="text-sm px-4 py-2 rounded-lg text-white bg-red-600 hover:bg-red-700"
+                            >
+                                Tolak
+                            </button>
+                            <button
+                                onClick={onSetujui}
+                                className="text-sm px-4 py-2 rounded-lg text-white bg-green-600 hover:bg-green-700"
+                            >
+                                Setujui
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
         </div>
     );
