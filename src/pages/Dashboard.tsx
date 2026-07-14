@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   QrCode,
   CalendarDays,
@@ -18,6 +17,8 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query'; // UBAH: baru
+import { useEffect } from 'react'; // UBAH: cuma buat sync ke context, bukan fetch lagi
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/Chatwidget';
 import AppLayout from '../components/AppLayout';
@@ -71,32 +72,31 @@ const upcomingEvents = [
 ];
 // ================================================================
 
-export default function Dashboard() {
-  const { setUser } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+// UBAH: fetchUser dipindah keluar komponen, dipakai queryFn
+async function fetchUser(): Promise<UserType> {
+  const res = await api.get<UserType>('/user');
+  return res.data;
+}
 
+export default function Dashboard() {
+  const { user: cachedUser, setUser } = useAuth();
+
+  // UBAH: useEffect + useState(loading/error) manual dihapus total, diganti useQuery
+  // staleTime 5 menit -> pindah halaman & balik lagi dalam 5 menit, ga fetch ulang
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['user'],
+    queryFn: fetchUser,
+    staleTime: 5 * 60 * 1000,
+    initialData: cachedUser ?? undefined, // UBAH: pakai user dari localStorage/context dulu sambil nunggu fetch, ga nge-blank
+  });
+
+  // UBAH: sync hasil query terbaru balik ke AuthContext (dipakai AppLayout, dll)
   useEffect(() => {
-    let mounted = true;
-    const fetchUser = async () => {
-      try {
-        const res = await api.get<UserType>('/user');
-        if (mounted) {
-          setUser(res.data);
-          setError(null);
-        }
-      } catch (err) {
-        if (mounted) setError('Gagal memuat data user. Silakan login ulang.');
-        console.error(err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    fetchUser();
-    return () => {
-      mounted = false;
-    };
-  }, [setUser]);
+    if (data) setUser(data);
+  }, [data, setUser]);
+
+  const loading = isLoading && !cachedUser; // UBAH: cuma tampilin loading kalau bener2 belum ada data sama sekali
+  const error = isError ? 'Gagal memuat data user. Silakan login ulang.' : null; // UBAH: derived dari isError
 
   const getGreeting = () => {
     const hour = new Date().getHours();

@@ -21,6 +21,7 @@ import PengajuanIzin from './pages/PengajuanIzin';
 import IzinForm from './pages/IzinPageForm';
 import Analytics from './pages/DashboardAnalytics';
 
+
 function App() {
   return (
     <AuthProvider>
