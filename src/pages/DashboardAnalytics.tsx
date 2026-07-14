@@ -7,9 +7,6 @@ import {
     Area,
     BarChart,
     Bar,
-    PieChart,
-    Pie,
-    Cell,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -24,56 +21,16 @@ type Role = 'admin' | 'hr' | 'manajer' | 'karyawan';
 /* =========================================================================
  * DUMMY DATA
  * TODO(backend): ganti seluruh blok ini dengan hasil fetch dari API, misal:
- *   GET /dashboard/cuti-summary
  *   GET /dashboard/cuti-tren
- *   GET /dashboard/barang-summary
  *   GET /dashboard/keuangan-summary
  * Bentuk data di bawah ini sengaja dibuat menyerupai kira-kira response
  * yang dibutuhkan, supaya nanti tinggal swap sumbernya tanpa ubah JSX.
  * =======================================================================*/
 
-
-const dummyJenisCuti = [
-    { jenis: 'Tahunan', jumlah: 38 },
-    { jenis: 'Sakit', jumlah: 24 },
-    { jenis: 'Izin', jumlah: 16 },
-    { jenis: 'Lainnya', jumlah: 6 },
-];
-
-const jenisCutiColors: Record<string, string> = {
-    Tahunan: '#111827',
-    Sakit: '#EF4444',
-    Izin: '#F59E0B',
-    Lainnya: '#9CA3AF',
-};
-
 interface TopKaryawan {
     nama: string;
     jumlah: number;
 }
-
-const dummyTrenBulanan = [
-    { bulan: 'Feb', pengajuan: 9 },
-    { bulan: 'Mar', pengajuan: 14 },
-    { bulan: 'Apr', pengajuan: 11 },
-    { bulan: 'Mei', pengajuan: 17 },
-    { bulan: 'Jun', pengajuan: 13 },
-    { bulan: 'Jul', pengajuan: 20 },
-];
-
-const dummyRingkasanBarang = {
-    totalMasuk: 1240,
-    totalKeluar: 980,
-};
-
-const dummyBarangBulanan = [
-    { bulan: 'Feb', masuk: 180, keluar: 140 },
-    { bulan: 'Mar', masuk: 210, keluar: 160 },
-    { bulan: 'Apr', masuk: 190, keluar: 155 },
-    { bulan: 'Mei', masuk: 230, keluar: 175 },
-    { bulan: 'Jun', masuk: 205, keluar: 168 },
-    { bulan: 'Jul', masuk: 225, keluar: 182 },
-];
 
 const dummyRingkasanKeuangan = {
     pemasukan: 186_500_000,
@@ -136,6 +93,26 @@ function StatCard({ label, value, hint, accent = 'default' }: StatCardProps) {
     );
 }
 
+function formatRelativeTime(dateString: string): string {
+    const date = new Date(dateString.replace(' ', 'T')); // jaga-jaga kalau format "YYYY-MM-DD HH:mm:ss"
+    if (isNaN(date.getTime())) return '-';
+
+    const diffSec = Math.floor((Date.now() - date.getTime()) / 1000);
+    if (diffSec < 60) return 'baru saja';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin} menit yang lalu`;
+    const diffHour = Math.floor(diffMin / 60);
+    if (diffHour < 24) return `${diffHour} jam yang lalu`;
+    const diffDay = Math.floor(diffHour / 24);
+    if (diffDay < 30) return `${diffDay} hari yang lalu`;
+    const diffMonth = Math.floor(diffDay / 30);
+    return `${diffMonth} bulan yang lalu`;
+}
+
+interface TrenPengajuan {
+    bulan: string;
+    pengajuan: number;
+}
 interface SectionProps {
     title: string;
     description?: string;
@@ -163,18 +140,38 @@ const chartTooltipStyle = {
 export default function DashboardAnalyticsPage() {
     const [currentRole, setCurrentRole] = useState<Role | null>(null);
     const [checkingAccess, setCheckingAccess] = useState<boolean>(true);
-    const [mutasi, setMutasi] = useState<mutasiBarang[]>([])
+    const [mutasi, setMutasi] = useState<mutasiBarang[]>([]);
     const [ringkasanCuti, setRingkasanCuti] = useState({
         total: 0,
         pending: 0,
         disetujui: 0,
         ditolak: 0,
     });
+    const [totalBarang, setTotalBarang] = useState({
+        jumlah_masuk: 0,
+        jumlah_keluar: 0,
+        update_masuk: null as string | null,
+        update_keluar: null as string | null,
+    });
     const [topKaryawan, setTopKaryawan] = useState<TopKaryawan[]>([]);
+    const [topKehadiran, setTopKehadiran] = useState<TopKaryawan[]>([]);
+    const [grafikP, setGrafikP] = useState<TrenPengajuan[]>([]);
+
+    // re-render tiap 30 detik biar teks "X menit yang lalu" ikut jalan tanpa refresh manual
+    const [, forceTick] = useState(0);
+    useEffect(() => {
+        const id = setInterval(() => forceTick((t) => t + 1), 30_000);
+        return () => clearInterval(id);
+    }, []);
 
     useEffect(() => {
         api.get('/dashboard-analytics/top-karyawan')
            .then((res) => setTopKaryawan(res.data))
+           .catch((err) => {
+            console.error(err)
+           });
+        api.get('/dashboard-analytics/top-kehadiran')
+           .then((res) => setTopKehadiran(res.data))
            .catch((err) => {
             console.error(err)
            });
@@ -194,6 +191,20 @@ export default function DashboardAnalyticsPage() {
                     jumlah_keluar: res.data.jumlah_keluar,
                 },
             ]);
+           })
+           .catch((err) => {
+            console.error(err)
+           })
+        api.get('/dashboard-analytics/total-barang')
+           .then((res) => {
+            setTotalBarang(res.data);
+           })
+           .catch((err) => {
+            console.error(err)
+           })
+        api.get('/dashboard-analytics/grafik-pengajuan')
+           .then((res) => {
+            setGrafikP(res.data);
            })
            .catch((err) => {
             console.error(err)
@@ -251,8 +262,18 @@ export default function DashboardAnalyticsPage() {
                 {/* Ringkasan Barang */}
                 <Section title="Ringkasan Inventaris">
                     <div className="grid grid-cols-2 gap-3">
-                        <StatCard label="Total Barang Masuk" value={`${dummyRingkasanBarang.totalMasuk.toLocaleString('id-ID')}`} hint="6 bulan terakhir" accent="green" />
-                        <StatCard label="Total Barang Keluar" value={`${dummyRingkasanBarang.totalKeluar.toLocaleString('id-ID')}`} hint="6 bulan terakhir" accent="red" />
+                        <StatCard
+                            label="Total Barang Masuk"
+                            value={`${totalBarang.jumlah_masuk.toLocaleString('id-ID')}`}
+                            hint={totalBarang.update_masuk ? `Update ${formatRelativeTime(totalBarang.update_masuk)}` : '6 bulan terakhir'}
+                            accent="green"
+                        />
+                        <StatCard
+                            label="Total Barang Keluar"
+                            value={`${totalBarang.jumlah_keluar.toLocaleString('id-ID')}`}
+                            hint={totalBarang.update_keluar ? `Update ${formatRelativeTime(totalBarang.update_keluar)}` : '6 bulan terakhir'}
+                            accent="red"
+                        />
                     </div>
                 </Section>
 
@@ -274,7 +295,7 @@ export default function DashboardAnalyticsPage() {
                 <Section title="Tren Pengajuan Cuti" description="Jumlah pengajuan cuti per bulan, 6 bulan terakhir.">
                     <div className="bg-white border border-gray-200 rounded-xl p-4">
                         <ResponsiveContainer width="100%" height={260}>
-                            <AreaChart data={dummyTrenBulanan} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+                            <AreaChart data={grafikP} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
                                 <defs>
                                     <linearGradient id="pengajuanGradient" x1="0" y1="0" x2="0" y2="1">
                                         <stop offset="0%" stopColor="#111827" stopOpacity={0.18} />
@@ -292,34 +313,32 @@ export default function DashboardAnalyticsPage() {
                 </Section>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {/* Breakdown Jenis Cuti */}
+                    {/* Top Karyawan Hadir (menggantikan Breakdown Jenis Cuti) */}
                     <div>
                         <div className="mb-3">
-                            <h2 className="text-sm font-semibold text-gray-900">Breakdown Jenis Cuti</h2>
-                            <p className="text-xs text-gray-500 mt-0.5">Proporsi tipe cuti yang diajukan.</p>
+                            <h2 className="text-sm font-semibold text-gray-900">Karyawan Kehadiran Terbanyak</h2>
+                            <p className="text-xs text-gray-500 mt-0.5">Top 5 karyawan berdasarkan jumlah absensi hadir.</p>
                         </div>
                         <div className="bg-white border border-gray-200 rounded-xl p-4">
                             <ResponsiveContainer width="100%" height={240}>
-                                <PieChart>
-                                    <Pie
-                                        data={dummyJenisCuti}
-                                        dataKey="jumlah"
-                                        nameKey="jenis"
-                                        innerRadius={55}
-                                        outerRadius={85}
-                                        paddingAngle={2}
-                                    >
-                                        {dummyJenisCuti.map((entry) => (
-                                            <Cell key={entry.jenis} fill={jenisCutiColors[entry.jenis]} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip contentStyle={chartTooltipStyle} />
-                                    <Legend
-                                        verticalAlign="bottom"
-                                        iconType="circle"
-                                        wrapperStyle={{ fontSize: 12, color: '#6B7280' }}
+                                <BarChart
+                                    data={topKehadiran}
+                                    layout="vertical"
+                                    margin={{ top: 0, right: 16, left: 0, bottom: 0 }}
+                                >
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F3F4F6" />
+                                    <XAxis type="number" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                    <YAxis
+                                        type="category"
+                                        dataKey="nama"
+                                        tick={{ fontSize: 12, fill: '#374151' }}
+                                        axisLine={false}
+                                        tickLine={false}
+                                        width={110}
                                     />
-                                </PieChart>
+                                    <Tooltip contentStyle={chartTooltipStyle} />
+                                    <Bar dataKey="jumlah" name="Hadir" fill="#16A34A" radius={[0, 4, 4, 0]} barSize={16} />
+                                </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
