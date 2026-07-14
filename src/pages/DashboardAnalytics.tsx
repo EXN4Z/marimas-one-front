@@ -18,33 +18,27 @@ import AppLayout from '../components/AppLayout';
 
 type Role = 'admin' | 'hr' | 'manajer' | 'karyawan';
 
-/* =========================================================================
- * DUMMY DATA
- * TODO(backend): ganti seluruh blok ini dengan hasil fetch dari API, misal:
- *   GET /dashboard/cuti-tren
- *   GET /dashboard/keuangan-summary
- * Bentuk data di bawah ini sengaja dibuat menyerupai kira-kira response
- * yang dibutuhkan, supaya nanti tinggal swap sumbernya tanpa ubah JSX.
- * =======================================================================*/
-
 interface TopKaryawan {
     nama: string;
     jumlah: number;
 }
 
-const dummyRingkasanKeuangan = {
-    pemasukan: 186_500_000,
-    pengeluaran: 132_800_000,
-};
+interface KeuanganBulanan {
+    bulan: string;
+    pemasukan: number;
+    pengeluaran: number;
+}
 
-const dummyKeuanganBulanan = [
-    { bulan: 'Feb', pemasukan: 24_000_000, pengeluaran: 18_500_000 },
-    { bulan: 'Mar', pemasukan: 27_500_000, pengeluaran: 20_100_000 },
-    { bulan: 'Apr', pemasukan: 26_000_000, pengeluaran: 19_400_000 },
-    { bulan: 'Mei', pemasukan: 31_200_000, pengeluaran: 23_800_000 },
-    { bulan: 'Jun', pemasukan: 33_400_000, pengeluaran: 24_600_000 },
-    { bulan: 'Jul', pemasukan: 34_400_000, pengeluaran: 26_400_000 },
-];
+interface TrenPengajuan {
+    bulan: string;
+    pengajuan: number;
+}
+
+interface mutasiBarang {
+    bulan: string;
+    jumlah_masuk: number;
+    jumlah_keluar: number;
+}
 
 /* ========================================================================= */
 
@@ -68,12 +62,6 @@ interface StatCardProps {
     value: string;
     hint?: string;
     accent?: 'default' | 'green' | 'red' | 'yellow';
-}
-
-interface mutasiBarang {
-    bulan: string;
-    jumlah_masuk: number;
-    jumlah_keluar: number;
 }
 
 const accentStyles: Record<NonNullable<StatCardProps['accent']>, string> = {
@@ -109,10 +97,6 @@ function formatRelativeTime(dateString: string): string {
     return `${diffMonth} bulan yang lalu`;
 }
 
-interface TrenPengajuan {
-    bulan: string;
-    pengajuan: number;
-}
 interface SectionProps {
     title: string;
     description?: string;
@@ -156,6 +140,8 @@ export default function DashboardAnalyticsPage() {
     const [topKaryawan, setTopKaryawan] = useState<TopKaryawan[]>([]);
     const [topKehadiran, setTopKehadiran] = useState<TopKaryawan[]>([]);
     const [grafikP, setGrafikP] = useState<TrenPengajuan[]>([]);
+    // UBAH: sekarang array per-bulan (6 bulan terakhir), bukan objek total tunggal
+    const [keuangan, setKeuangan] = useState<KeuanganBulanan[]>([]);
 
     // re-render tiap 30 detik biar teks "X menit yang lalu" ikut jalan tanpa refresh manual
     const [, forceTick] = useState(0);
@@ -184,13 +170,7 @@ export default function DashboardAnalyticsPage() {
            })
         api.get('/dashboard-analytics/mutasi-barang')
            .then((res) => {
-            setMutasi([
-                {
-                    bulan: res.data.bulan,
-                    jumlah_masuk: res.data.jumlah_masuk,
-                    jumlah_keluar: res.data.jumlah_keluar,
-                },
-            ]);
+            setMutasi(res.data); // UBAH: backend sekarang balikin array 6 bulan langsung
            })
            .catch((err) => {
             console.error(err)
@@ -208,6 +188,13 @@ export default function DashboardAnalyticsPage() {
            })
            .catch((err) => {
             console.error(err)
+           })
+        api.get('/dashboard-analytics/total-keuangan')
+           .then((res) => {
+            setKeuangan(res.data)
+           })
+           .catch((err) => {
+            console.error(err);
            })
         api
             .get<{ role: Role }>('/user')
@@ -239,7 +226,10 @@ export default function DashboardAnalyticsPage() {
         );
     }
 
-    const saldoBersih = dummyRingkasanKeuangan.pemasukan - dummyRingkasanKeuangan.pengeluaran;
+    // UBAH: total pemasukan/pengeluaran dijumlah dari data 6 bulan, bukan dummy lagi
+    const totalPemasukan = keuangan.reduce((sum, k) => sum + k.pemasukan, 0);
+    const totalPengeluaran = keuangan.reduce((sum, k) => sum + k.pengeluaran, 0);
+    const saldoBersih = totalPemasukan - totalPengeluaran;
 
     return (
         <AppLayout title="Dashboard Analytics">
@@ -280,8 +270,8 @@ export default function DashboardAnalyticsPage() {
                 {/* Ringkasan Keuangan */}
                 <Section title="Ringkasan Keuangan">
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        <StatCard label="Total Pemasukan" value={formatRupiah(dummyRingkasanKeuangan.pemasukan)} hint="6 bulan terakhir" accent="green" />
-                        <StatCard label="Total Pengeluaran" value={formatRupiah(dummyRingkasanKeuangan.pengeluaran)} hint="6 bulan terakhir" accent="red" />
+                        <StatCard label="Total Pemasukan" value={formatRupiah(totalPemasukan)} hint="6 bulan terakhir" accent="green" />
+                        <StatCard label="Total Pengeluaran" value={formatRupiah(totalPengeluaran)} hint="6 bulan terakhir" accent="red" />
                         <StatCard
                             label="Saldo Bersih"
                             value={formatRupiah(saldoBersih)}
@@ -313,7 +303,7 @@ export default function DashboardAnalyticsPage() {
                 </Section>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                    {/* Top Karyawan Hadir (menggantikan Breakdown Jenis Cuti) */}
+                    {/* Top Karyawan Hadir */}
                     <div>
                         <div className="mb-3">
                             <h2 className="text-sm font-semibold text-gray-900">Karyawan Kehadiran Terbanyak</h2>
@@ -395,7 +385,7 @@ export default function DashboardAnalyticsPage() {
                 <Section title="Pemasukan vs Pengeluaran" description="Arus keuangan per bulan, 6 bulan terakhir.">
                     <div className="bg-white border border-gray-200 rounded-xl p-4">
                         <ResponsiveContainer width="100%" height={260}>
-                            <LineChart data={dummyKeuanganBulanan} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                            <LineChart data={keuangan} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                                 <XAxis dataKey="bulan" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} />
                                 <YAxis
@@ -413,10 +403,6 @@ export default function DashboardAnalyticsPage() {
                         </ResponsiveContainer>
                     </div>
                 </Section>
-
-                <p className="text-xs text-gray-400 text-center pb-4">
-                    * Data pada halaman ini masih data contoh (dummy) sambil menunggu endpoint backend siap.
-                </p>
             </div>
         </AppLayout>
     );
