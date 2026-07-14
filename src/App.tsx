@@ -51,7 +51,6 @@ function App() {
               element={
                 <AdminRoute>
                   <KaryawanCreate />
-                  <AuditLog />
                 </AdminRoute>
               }
             />
