@@ -1,15 +1,33 @@
 import { useEffect, useState } from 'react';
-import { Package, ArrowDownCircle, ArrowUpCircle, Search, X, AlertTriangle, ScanLine, QrCode } from 'lucide-react';
+import {
+  Package,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Search,
+  X,
+  AlertTriangle,
+  ScanLine,
+  QrCode,
+  Plus,
+  Pencil,
+  Trash2,
+} from 'lucide-react';
 import AppLayout from '../components/AppLayout';
 import ScanQrModal from '../components/ScanQrModal';
 import QrCodeModal from '../components/QrCodeModal';
+import { useAuth } from '../context/AuthContext';
 import {
   getBarang,
   getRiwayatSemua,
   getBarangByKode,
+  getKategoriBarang,
+  createBarang,
+  updateBarang,
+  deleteBarang,
   scanMasuk,
   scanKeluar,
   type Barang,
+  type KategoriBarang,
   type Mutasi,
 } from '../api/barang';
 
@@ -27,9 +45,29 @@ function formatWaktu(iso: string): string {
   return date.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
 }
 
+interface BarangFormState {
+  nama: string;
+  kategori_id: string;
+  satuan: string;
+  stok: string;
+  stok_minimum: string;
+}
+
+const emptyForm: BarangFormState = {
+  nama: '',
+  kategori_id: '',
+  satuan: '',
+  stok: '0',
+  stok_minimum: '0',
+};
+
 export default function Inventaris() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
+
   const [barang, setBarang] = useState<Barang[]>([]);
   const [mutasi, setMutasi] = useState<Mutasi[]>([]);
+  const [kategoriList, setKategoriList] = useState<KategoriBarang[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -45,6 +83,15 @@ export default function Inventaris() {
   const [scanError, setScanError] = useState('');
   const [qrBarang, setQrBarang] = useState<Barang | null>(null);
   const [lookingUpBarang, setLookingUpBarang] = useState(false); // BARU: loading pas lookup barang setelah scan/upload
+
+  // CRUD barang (khusus admin)
+  const [formMode, setFormMode] = useState<'create' | 'edit' | null>(null);
+  const [formData, setFormData] = useState<BarangFormState>(emptyForm);
+  const [formSubmitting, setFormSubmitting] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [barangToDelete, setBarangToDelete] = useState<Barang | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -64,6 +111,87 @@ export default function Inventaris() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    getKategoriBarang()
+      .then(setKategoriList)
+      .catch(() => {}); // gagal ambil kategori bukan blocker, form tetap bisa dipakai tanpa kategori
+  }, [isAdmin]);
+
+  const openCreateForm = () => {
+    setFormData(emptyForm);
+    setFormError('');
+    setEditingId(null);
+    setFormMode('create');
+  };
+
+  const openEditForm = (item: Barang) => {
+    setFormData({
+      nama: item.nama,
+      kategori_id: item.kategori_id ? String(item.kategori_id) : '',
+      satuan: item.satuan,
+      stok: String(item.stok),
+      stok_minimum: String(item.stok_minimum),
+    });
+    setFormError('');
+    setEditingId(item.id);
+    setFormMode('edit');
+  };
+
+  const closeForm = () => {
+    setFormMode(null);
+    setFormData(emptyForm);
+    setFormError('');
+    setEditingId(null);
+  };
+
+  const handleFormSubmit = async () => {
+    if (!formData.nama.trim()) {
+      setFormError('Nama barang wajib diisi.');
+      return;
+    }
+
+    setFormSubmitting(true);
+    setFormError('');
+    try {
+      const payload = {
+        nama: formData.nama.trim(),
+        kategori_id: formData.kategori_id ? Number(formData.kategori_id) : null,
+        satuan: formData.satuan.trim() || undefined,
+        stok_minimum: formData.stok_minimum ? Number(formData.stok_minimum) : undefined,
+      };
+
+      if (formMode === 'create') {
+        const created = await createBarang({ ...payload, stok: Number(formData.stok) || 0 });
+        setBarang((prev) => [created, ...prev]);
+      } else if (formMode === 'edit' && editingId !== null) {
+        const updated = await updateBarang(editingId, payload);
+        setBarang((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+      }
+      closeForm();
+    } catch (err: any) {
+      setFormError(err.response?.data?.message || 'Gagal menyimpan barang. Coba lagi.');
+    } finally {
+      setFormSubmitting(false);
+    }
+  };
+
+  const confirmDeleteBarang = async () => {
+    if (!barangToDelete) return;
+
+    setDeleting(true);
+    try {
+      await deleteBarang(barangToDelete.id);
+      setBarang((prev) => prev.filter((b) => b.id !== barangToDelete.id));
+      setBarangToDelete(null);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Gagal menghapus barang. Coba lagi.');
+      setBarangToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const filteredBarang = barang
     .filter(
@@ -142,16 +270,27 @@ export default function Inventaris() {
     <AppLayout title="Inventaris">
       <div className="flex items-center justify-between mb-2">
         <p className="text-sm text-slate-500">Kelola stok barang masuk dan keluar.</p>
-        <button
-          onClick={() => {
-            setScanError('');
-            setScannerOpen(true);
-          }}
-          className="flex items-center gap-2 bg-slate-900 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-slate-800 transition"
-        >
-          <ScanLine size={16} />
-          Scan QR
-        </button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={openCreateForm}
+              className="flex items-center gap-2 bg-white border border-slate-300 text-slate-700 text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-slate-50 transition"
+            >
+              <Plus size={16} />
+              Tambah Barang
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setScanError('');
+              setScannerOpen(true);
+            }}
+            className="flex items-center gap-2 bg-slate-900 text-white text-sm font-semibold px-4 py-2.5 rounded-lg hover:bg-slate-800 transition"
+          >
+            <ScanLine size={16} />
+            Scan QR
+          </button>
+        </div>
       </div>
 
       <nav className="mb-6">
@@ -268,6 +407,24 @@ export default function Inventaris() {
                     >
                       <ArrowUpCircle size={16} />
                     </button>
+                    {isAdmin && (
+                      <>
+                        <button
+                          onClick={() => openEditForm(item)}
+                          title="Edit Barang"
+                          className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                        <button
+                          onClick={() => setBarangToDelete(item)}
+                          title="Hapus Barang"
+                          className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -413,6 +570,137 @@ export default function Inventaris() {
       )}
 
       {qrBarang && <QrCodeModal barang={qrBarang} onClose={() => setQrBarang(null)} />}
+
+      {/* FORM TAMBAH / EDIT BARANG (khusus admin) */}
+      {formMode && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center px-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-slate-900">
+                {formMode === 'create' ? 'Tambah Barang' : 'Edit Barang'}
+              </h3>
+              <button onClick={closeForm} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nama Barang</label>
+                <input
+                  value={formData.nama}
+                  onChange={(e) => setFormData((f) => ({ ...f, nama: e.target.value }))}
+                  placeholder="cth. Marimas Rasa Jeruk 7g"
+                  autoFocus
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Kategori</label>
+                <select
+                  value={formData.kategori_id}
+                  onChange={(e) => setFormData((f) => ({ ...f, kategori_id: e.target.value }))}
+                  className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                >
+                  <option value="">Tanpa kategori</option>
+                  {kategoriList.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.nama}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Satuan</label>
+                  <input
+                    value={formData.satuan}
+                    onChange={(e) => setFormData((f) => ({ ...f, satuan: e.target.value }))}
+                    placeholder="pcs, dus, kg..."
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Stok Minimum</label>
+                  <input
+                    type="number"
+                    value={formData.stok_minimum}
+                    onChange={(e) => setFormData((f) => ({ ...f, stok_minimum: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                </div>
+              </div>
+
+              {formMode === 'create' && (
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Stok Awal</label>
+                  <input
+                    type="number"
+                    value={formData.stok}
+                    onChange={(e) => setFormData((f) => ({ ...f, stok: e.target.value }))}
+                    className="w-full px-3 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
+                  />
+                </div>
+              )}
+
+              {formMode === 'edit' && (
+                <p className="text-xs text-slate-400">
+                  Stok tidak diedit di sini — pakai tombol Barang Masuk / Keluar supaya riwayat mutasinya tetap tercatat.
+                </p>
+              )}
+            </div>
+
+            {formError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                {formError}
+              </p>
+            )}
+
+            <button
+              onClick={handleFormSubmit}
+              disabled={formSubmitting || !formData.nama.trim()}
+              className="w-full bg-slate-900 text-white text-sm font-semibold py-3 rounded-lg hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {formSubmitting
+                ? 'Menyimpan...'
+                : formMode === 'create'
+                ? 'Tambah Barang'
+                : 'Simpan Perubahan'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* KONFIRMASI HAPUS BARANG (khusus admin) */}
+      {barangToDelete && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 px-4">
+          <div className="bg-white rounded-xl w-full max-w-sm p-5">
+            <h2 className="text-base font-semibold text-slate-900 mb-1">Hapus barang?</h2>
+            <p className="text-sm text-slate-500 mb-5">
+              <span className="font-medium text-slate-700">{barangToDelete.nama}</span> akan dihapus
+              permanen beserta riwayat mutasinya, dan tidak bisa dikembalikan.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setBarangToDelete(null)}
+                disabled={deleting}
+                className="text-sm px-4 py-2 rounded-lg border border-slate-200 hover:bg-slate-50 disabled:opacity-50"
+              >
+                Batal
+              </button>
+              <button
+                onClick={confirmDeleteBarang}
+                disabled={deleting}
+                className="text-sm px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Menghapus...' : 'Ya, hapus'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

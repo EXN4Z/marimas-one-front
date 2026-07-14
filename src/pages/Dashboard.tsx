@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   QrCode,
   CalendarDays,
@@ -18,6 +18,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/Chatwidget';
 import AppLayout from '../components/AppLayout';
@@ -42,14 +43,6 @@ const attendanceTrend = [
   { day: 'Min', hadir: 5, target: 10 },
 ];
 
-const divisiDistribusi = [
-  { divisi: 'Produksi', jumlah: 48 },
-  { divisi: 'IT', jumlah: 12 },
-  { divisi: 'HR', jumlah: 8 },
-  { divisi: 'Finance', jumlah: 10 },
-  { divisi: 'Marketing', jumlah: 15 },
-];
-
 const topDivisi = [
   { name: 'Produksi', percent: 68, color: 'bg-blue-500' },
   { name: 'Marketing', percent: 45, color: 'bg-emerald-500' },
@@ -70,46 +63,51 @@ const upcomingEvents = [
   { title: 'Training AI Assistant', date: 'Jumat, 13:00' },
 ];
 // ================================================================
+
 interface departemenDistribusi {
   departemen: string;
   jumlah: number;
 }
 
-export default function Dashboard() {
-  const { setUser } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [departemen, setDepartemen] = useState<departemenDistribusi[]>([])
+// UBAH: fetchUser dipindah keluar komponen, dipakai queryFn
+async function fetchUser(): Promise<UserType> {
+  const res = await api.get<UserType>('/user');
+  return res.data;
+}
 
+export default function Dashboard() {
+  const { user: cachedUser, setUser } = useAuth();
+  const [departemen, setDepartemen] = useState<departemenDistribusi[]>([]);
+
+  // UBAH: useEffect + useState(loading/error) manual dihapus total, diganti useQuery
+  // staleTime 5 menit -> pindah halaman & balik lagi dalam 5 menit, ga fetch ulang
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['user'],
+    queryFn: fetchUser,
+    staleTime: 5 * 60 * 1000,
+    initialData: cachedUser ?? undefined, // UBAH: pakai user dari localStorage/context dulu sambil nunggu fetch, ga nge-blank
+  });
+
+  // UBAH: sync hasil query terbaru balik ke AuthContext (dipakai AppLayout, dll)
   useEffect(() => {
-    api.get('/dashboard/kpd')
-    .then((res) => {
-        console.log("BERHASIL", res.data);
+    if (data) setUser(data);
+  }, [data, setUser]);
+
+  // Fetch data distribusi departemen buat chart
+  useEffect(() => {
+    api
+      .get('/dashboard/kpd')
+      .then((res) => {
+        console.log('BERHASIL', res.data);
         setDepartemen(res.data);
-    })
-    .catch((err) => {
+      })
+      .catch((err) => {
         console.log(err.response);
-    });
-    let mounted = true;
-    const fetchUser = async () => {
-      try {
-        const res = await api.get<UserType>('/user');
-        if (mounted) {
-          setUser(res.data);
-          setError(null);
-        }
-      } catch (err) {
-        if (mounted) setError('Gagal memuat data user. Silakan login ulang.');
-        console.error(err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    };
-    fetchUser();
-    return () => {
-      mounted = false;
-    };
-  }, [setUser]);
+      });
+  }, []);
+
+  const loading = isLoading && !cachedUser; // UBAH: cuma tampilin loading kalau bener2 belum ada data sama sekali
+  const error = isError ? 'Gagal memuat data user. Silakan login ulang.' : null; // UBAH: derived dari isError
 
   const getGreeting = () => {
     const hour = new Date().getHours();

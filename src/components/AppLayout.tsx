@@ -69,6 +69,9 @@ export default function AppLayout({ title, children }: AppLayoutProps) {
   if (item.label === 'Audit Log' && user?.role !== 'admin') {
     return false;
   }
+  else if (item.label === 'Dashboard Analytics' && user?.role === 'karyawan') {
+    return false;
+  }
 
   return true;
   });

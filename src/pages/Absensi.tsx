@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react'; // UBAH: hapus useEffect, ga dipake lagi
 import {
   Users,
   UserCheck,
@@ -16,15 +16,14 @@ import AppLayout from '../components/AppLayout';
 import ScanQrModal from '../components/ScanQrModal';
 import KaryawanQrModal from '../components/KaryawanQrModal';
 import {
-  getKaryawanAktif,
-  getAbsensiHariIni,
-  getRiwayatAbsensi,
   getKaryawanByKode,
   scanAbsen,
   type Karyawan,
   type Absensi,
   type Role,
-} from '../api/absensi';
+} from '../api/absensi'; // UBAH: getKaryawanAktif, getAbsensiHariIni, getRiwayatAbsensi dipindah ke hooks, ga di-import langsung lagi di sini
+import { useQueryClient } from '@tanstack/react-query'; // UBAH: baru, buat setQueryData
+import { useKaryawanAktif, useAbsensiHariIni, useRiwayatAbsensi } from '../hooks/useAbsensi'; // UBAH: baru
 
 type TabKey = 'semua' | 'sudah_absen' | 'belum_absen';
 
@@ -65,11 +64,15 @@ function formatWaktu(tanggal: string): string {
 }
 
 export default function AbsensiPage() {
-  const [karyawanList, setKaryawanList] = useState<Karyawan[]>([]);
-  const [absensiHariIni, setAbsensiHariIni] = useState<Absensi[]>([]);
-  const [riwayat, setRiwayat] = useState<Absensi[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const queryClient = useQueryClient(); // UBAH: baru
+
+  // UBAH: 4 baris di bawah ini gantiin useState karyawanList/absensiHariIni/riwayat/loading/error + loadData + useEffect (semuanya dihapus)
+  const { data: karyawanList = [], isLoading: loadingKaryawan, isError: errorKaryawan } = useKaryawanAktif();
+  const { data: absensiHariIni = [], isLoading: loadingAbsensi } = useAbsensiHariIni();
+  const { data: riwayat = [] } = useRiwayatAbsensi(10);
+  const loading = loadingKaryawan || loadingAbsensi; // UBAH: gabungan loading dari 2 query utama
+  const error = errorKaryawan ? 'Gagal memuat data absensi. Coba refresh halaman.' : ''; // UBAH: derived dari isError, bukan state manual
+
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('semua');
 
@@ -83,29 +86,7 @@ export default function AbsensiPage() {
   const [scanError, setScanError] = useState('');
   const [qrKaryawan, setQrKaryawan] = useState<Karyawan | null>(null);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const [karyawanData, absensiData, riwayatData] = await Promise.all([
-        getKaryawanAktif(),
-        getAbsensiHariIni(),
-        getRiwayatAbsensi(10),
-      ]);
-      setKaryawanList(karyawanData);
-      setAbsensiHariIni(absensiData);
-      setRiwayat(riwayatData);
-    } catch (err) {
-      setError('Gagal memuat data absensi. Coba refresh halaman.');
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    loadData();
-  }, []);
+  // UBAH: loadData() dihapus total, react-query yang urus fetch + cache
 
   const findAbsensi = (pekerjaId: number) =>
     absensiHariIni.find((a) => a.karyawan_id === pekerjaId) || null;
@@ -178,13 +159,18 @@ export default function AbsensiPage() {
     try {
       const result = await scanAbsen(modalKaryawan.qr_code);
 
-      setAbsensiHariIni((prev) => {
+      // UBAH: setAbsensiHariIni(...) diganti queryClient.setQueryData ke key ['absensi-hari-ini']
+      queryClient.setQueryData<Absensi[]>(['absensi-hari-ini'], (prev = []) => {
         const exists = prev.some((a) => a.id === result.absensi.id);
         return exists
           ? prev.map((a) => (a.id === result.absensi.id ? result.absensi : a))
           : [...prev, result.absensi];
       });
-      setRiwayat((prev) => [{ ...result.absensi, pekerja: result.pekerja }, ...prev].slice(0, 10));
+
+      // UBAH: setRiwayat(...) diganti queryClient.setQueryData ke key ['riwayat-absensi', 10]
+      queryClient.setQueryData<Absensi[]>(['riwayat-absensi', 10], (prev = []) =>
+        [{ ...result.absensi, pekerja: result.pekerja }, ...prev].slice(0, 10)
+      );
 
       closeModal();
     } catch (err: any) {
@@ -194,13 +180,7 @@ export default function AbsensiPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <AppLayout title="Absensi">
-        <p className="text-sm text-slate-500">Memuat data absensi...</p>
-      </AppLayout>
-    );
-  }
+  // UBAH: blok "if (loading) return <AppLayout>...</AppLayout>" DIHAPUS TOTAL — dulu ini gate seluruh halaman
 
   return (
     <AppLayout title="Absensi">
@@ -302,91 +282,94 @@ export default function AbsensiPage() {
           </div>
 
           <div className="flex flex-col gap-2">
-            {filteredKaryawan.map((item) => {
-              const rec = findAbsensi(item.id);
-              const sudahMasuk = !!rec?.jam_masuk;
-              const sudahPulang = !!rec?.jam_pulang;
+            {loading ? (
+              <p className="text-sm text-slate-400 text-center py-8">Memuat data karyawan...</p>
+            ) : (
+              <>
+                {filteredKaryawan.map((item) => {
+                  const rec = findAbsensi(item.id);
+                  const sudahMasuk = !!rec?.jam_masuk;
+                  const sudahPulang = !!rec?.jam_pulang;
 
-              return (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition"
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-700 flex-shrink-0">
-                      {initials(item.user.name)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium text-slate-800 truncate">{item.user.name}</p>
-                        {rec?.status === 'telat' && (
-                          <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex-shrink-0">
-                            Terlambat
-                          </span>
-                        )}
-                        {rec?.status_pulang === 'pulang_cepat' && (
-                          <span className="text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full flex-shrink-0">
-                            Pulang Cepat
-                          </span>
-                        )}
+                  return (
+                    <div key={item.id} className="flex items-center justify-between border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-700 flex-shrink-0">
+                          {initials(item.user.name)}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-slate-800 truncate">{item.user.name}</p>
+                            {rec?.status === 'telat' && (
+                              <span className="text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                                Terlambat
+                              </span>
+                            )}
+                            {rec?.status_pulang === 'pulang_cepat' && (
+                              <span className="text-[10px] font-semibold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full flex-shrink-0">
+                                Pulang Cepat
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-400">
+                            {item.nip} · {roleLabels[item.user.role]} · {item.departemen?.nama || '-'}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-400">
-                        {item.nip} · {roleLabels[item.user.role]} · {item.departemen?.nama || '-'}
-                      </p>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center gap-4 flex-shrink-0 ml-3">
-                    <div className="text-right hidden sm:block">
-                      <p className="text-xs text-slate-400">
-                        Masuk <span className="font-semibold text-slate-700">{formatJam(rec?.jam_masuk ?? null)}</span>
-                      </p>
-                      <p className="text-xs text-slate-400">
-                        Pulang <span className="font-semibold text-slate-700">{formatJam(rec?.jam_pulang ?? null)}</span>
-                      </p>
+                      <div className="flex items-center gap-4 flex-shrink-0 ml-3">
+                        <div className="text-right hidden sm:block">
+                          <p className="text-xs text-slate-400">
+                            Masuk <span className="font-semibold text-slate-700">{formatJam(rec?.jam_masuk ?? null)}</span>
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            Pulang <span className="font-semibold text-slate-700">{formatJam(rec?.jam_pulang ?? null)}</span>
+                          </p>
+                        </div>
+                        <div className="flex gap-1.5">
+                          <button
+                            onClick={() => setQrKaryawan(item)}
+                            title="Lihat / Cetak QR"
+                            className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition"
+                          >
+                            <QrCode size={16} />
+                          </button>
+                          {!sudahMasuk && (
+                            <button
+                              onClick={() => openModal(item)}
+                              title="Tandai Masuk"
+                              className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
+                            >
+                              <ArrowDownCircle size={16} />
+                            </button>
+                          )}
+                          {sudahMasuk && !sudahPulang && (
+                            <button
+                              onClick={() => openModal(item)}
+                              title="Tandai Pulang"
+                              className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition"
+                            >
+                              <ArrowUpCircle size={16} />
+                            </button>
+                          )}
+                          {sudahMasuk && sudahPulang && (
+                            <span
+                              title="Absen lengkap hari ini"
+                              className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center"
+                            >
+                              <CheckCircle2 size={16} />
+                            </span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex gap-1.5">
-                      <button
-                        onClick={() => setQrKaryawan(item)}
-                        title="Lihat / Cetak QR"
-                        className="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center hover:bg-slate-200 transition"
-                      >
-                        <QrCode size={16} />
-                      </button>
-                      {!sudahMasuk && (
-                        <button
-                          onClick={() => openModal(item)}
-                          title="Tandai Masuk"
-                          className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center hover:bg-emerald-100 transition"
-                        >
-                          <ArrowDownCircle size={16} />
-                        </button>
-                      )}
-                      {sudahMasuk && !sudahPulang && (
-                        <button
-                          onClick={() => openModal(item)}
-                          title="Tandai Pulang"
-                          className="w-8 h-8 rounded-lg bg-red-50 text-red-600 flex items-center justify-center hover:bg-red-100 transition"
-                        >
-                          <ArrowUpCircle size={16} />
-                        </button>
-                      )}
-                      {sudahMasuk && sudahPulang && (
-                        <span
-                          title="Absen lengkap hari ini"
-                          className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 flex items-center justify-center"
-                        >
-                          <CheckCircle2 size={16} />
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
 
-            {filteredKaryawan.length === 0 && (
-              <p className="text-sm text-slate-400 text-center py-8">Karyawan tidak ditemukan.</p>
+                {filteredKaryawan.length === 0 && (
+                  <p className="text-sm text-slate-400 text-center py-8">Karyawan tidak ditemukan.</p>
+                )}
+              </>
             )}
           </div>
         </div>
