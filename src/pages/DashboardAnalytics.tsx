@@ -113,6 +113,12 @@ interface StatCardProps {
     accent?: 'default' | 'green' | 'red' | 'yellow';
 }
 
+interface mutasiBarang {
+    bulan: string;
+    jumlah_masuk: number;
+    jumlah_keluar: number;
+}
+
 const accentStyles: Record<NonNullable<StatCardProps['accent']>, string> = {
     default: 'text-gray-900',
     green: 'text-green-600',
@@ -157,6 +163,7 @@ const chartTooltipStyle = {
 export default function DashboardAnalyticsPage() {
     const [currentRole, setCurrentRole] = useState<Role | null>(null);
     const [checkingAccess, setCheckingAccess] = useState<boolean>(true);
+    const [mutasi, setMutasi] = useState<mutasiBarang[]>([])
     const [ringkasanCuti, setRingkasanCuti] = useState({
         total: 0,
         pending: 0,
@@ -177,6 +184,19 @@ export default function DashboardAnalyticsPage() {
            })
            .catch((err) => {
                 console.error(err);
+           })
+        api.get('/dashboard-analytics/mutasi-barang')
+           .then((res) => {
+            setMutasi([
+                {
+                    bulan: res.data.bulan,
+                    jumlah_masuk: res.data.jumlah_masuk,
+                    jumlah_keluar: res.data.jumlah_keluar,
+                },
+            ]);
+           })
+           .catch((err) => {
+            console.error(err)
            })
         api
             .get<{ role: Role }>('/user')
@@ -339,14 +359,14 @@ export default function DashboardAnalyticsPage() {
                 <Section title="Barang Masuk vs Keluar" description="Perbandingan jumlah barang masuk dan keluar per bulan.">
                     <div className="bg-white border border-gray-200 rounded-xl p-4">
                         <ResponsiveContainer width="100%" height={260}>
-                            <BarChart data={dummyBarangBulanan} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+                            <BarChart data={mutasi} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
                                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                                 <XAxis dataKey="bulan" tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} />
                                 <YAxis tick={{ fontSize: 12, fill: '#6B7280' }} axisLine={false} tickLine={false} allowDecimals={false} />
                                 <Tooltip contentStyle={chartTooltipStyle} />
                                 <Legend wrapperStyle={{ fontSize: 12 }} />
-                                <Bar dataKey="masuk" name="Barang Masuk" fill="#16A34A" radius={[4, 4, 0, 0]} barSize={18} />
-                                <Bar dataKey="keluar" name="Barang Keluar" fill="#DC2626" radius={[4, 4, 0, 0]} barSize={18} />
+                                <Bar dataKey="jumlah_masuk" name="Barang Masuk" fill="#16A34A" radius={[4, 4, 0, 0]} barSize={18} />
+                                <Bar dataKey="jumlah_keluar" name="Barang Keluar" fill="#DC2626" radius={[4, 4, 0, 0]} barSize={18} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
