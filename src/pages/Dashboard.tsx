@@ -25,14 +25,7 @@ import AppLayout from '../components/AppLayout';
 import api from '../api/axios';
 import type { User as UserType } from '../types/user';
 
-// ====== PLACEHOLDER DATA (belum ada endpoint di backend) ======
-const placeholderStats = [
-  { label: 'Kehadiran Bulan Ini', value: '22/23', trend: '+2 dari bulan lalu', icon: QrCode },
-  { label: 'Cuti Tersisa', value: '8 hari', trend: 'dari 12 hari/tahun', icon: CalendarDays },
-  { label: 'Izin Pending', value: '1', trend: 'menunggu approval', icon: FileText },
-  { label: 'Ticket Aktif', value: '3', trend: '1 selesai minggu ini', icon: Ticket },
-];
-
+// ====== MASIH DUMMY (belum ada endpoint di backend) ======
 const attendanceTrend = [
   { day: 'Sen', hadir: 42, target: 45 },
   { day: 'Sel', hadir: 44, target: 45 },
@@ -43,12 +36,8 @@ const attendanceTrend = [
   { day: 'Min', hadir: 5, target: 10 },
 ];
 
-const topDivisi = [
-  { name: 'Produksi', percent: 68, color: 'bg-blue-500' },
-  { name: 'Marketing', percent: 45, color: 'bg-emerald-500' },
-  { name: 'Finance', percent: 30, color: 'bg-violet-500' },
-  { name: 'IT', percent: 22, color: 'bg-amber-500' },
-];
+// Palet warna di-cycle sesuai jumlah departemen asli dari database
+const divisiColors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
 
 const notifications = [
   { text: 'Izin kamu disetujui HR', time: '10 menit lalu', unread: true },
@@ -67,12 +56,43 @@ const upcomingEvents = [
 interface departemenDistribusi {
   departemen: string;
   jumlah: number;
+  percent: number;
+}
+
+// TAMBAH: tipe response dari /dashboard/stats-card (controller statsCard())
+interface StatItem {
+  value: number | string;
+  trend: string;
+}
+
+interface StatsCardResponse {
+  kehadiran: StatItem;
+  izin: StatItem;
+  cuti: StatItem;
+  ticket: StatItem;
 }
 
 // UBAH: fetchUser dipindah keluar komponen, dipakai queryFn
 async function fetchUser(): Promise<UserType> {
   const res = await api.get<UserType>('/user');
   return res.data;
+}
+
+// TAMBAH: fetch stats card dari backend
+async function fetchStatsCard(): Promise<StatsCardResponse> {
+  const res = await api.get<StatsCardResponse>('/dashboard/stats-card'); // TODO: sesuaikan route aslinya
+  return res.data;
+}
+
+// TAMBAH: gabungkan data asli dari backend dengan label & icon UI
+function buildStatCards(stats?: StatsCardResponse) {
+  if (!stats) return [];
+  return [
+    { label: 'Kehadiran Bulan Ini', value: stats.kehadiran.value, trend: stats.kehadiran.trend, icon: QrCode },
+    { label: 'Cuti Tersisa', value: stats.cuti.value, trend: stats.cuti.trend, icon: CalendarDays },
+    { label: 'Izin Pending', value: stats.izin.value, trend: stats.izin.trend, icon: FileText },
+    { label: 'Ticket Aktif', value: stats.ticket.value, trend: stats.ticket.trend, icon: Ticket },
+  ];
 }
 
 export default function Dashboard() {
@@ -88,12 +108,19 @@ export default function Dashboard() {
     initialData: cachedUser ?? undefined, // UBAH: pakai user dari localStorage/context dulu sambil nunggu fetch, ga nge-blank
   });
 
+  // TAMBAH: fetch stats card (kehadiran, izin, cuti, ticket) pakai useQuery juga
+  const { data: statsCard } = useQuery({
+    queryKey: ['stats-card'],
+    queryFn: fetchStatsCard,
+    staleTime: 5 * 60 * 1000,
+  });
+
   // UBAH: sync hasil query terbaru balik ke AuthContext (dipakai AppLayout, dll)
   useEffect(() => {
     if (data) setUser(data);
   }, [data, setUser]);
 
-  // Fetch data distribusi departemen buat chart
+  // Fetch data distribusi departemen buat chart (dari /dashboard/kpd)
   useEffect(() => {
     api
       .get('/dashboard/kpd')
@@ -127,7 +154,12 @@ export default function Dashboard() {
 
   return (
     <AppLayout title="Dashboard">
-      <DashboardContent error={error} getGreeting={getGreeting} departemen={departemen} />
+      <DashboardContent
+        error={error}
+        getGreeting={getGreeting}
+        departemen={departemen}
+        statCards={buildStatCards(statsCard)}
+      />
       <ChatWidget />
     </AppLayout>
   );
@@ -137,10 +169,12 @@ function DashboardContent({
   error,
   getGreeting,
   departemen,
+  statCards,
 }: {
   error: string | null;
   getGreeting: () => string;
   departemen: departemenDistribusi[];
+  statCards: ReturnType<typeof buildStatCards>;
 }) {
   const { user } = useAuth();
 
@@ -158,24 +192,32 @@ function DashboardContent({
 
       {/* STAT CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {placeholderStats.map((stat) => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-slate-200">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-slate-100 text-slate-700">
-                <Icon size={20} />
-              </div>
-              <p className="text-2xl font-bold text-slate-900 mt-3">{stat.value}</p>
-              <p className="text-xs text-slate-500 mt-1">{stat.label}</p>
-              <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                <TrendingUp size={12} /> {stat.trend}
-              </p>
-            </div>
-          );
-        })}
+        {statCards.length === 0
+          ? // Skeleton sementara nunggu statsCard fetch selesai
+            Array.from({ length: 4 }).map((_, i) => (
+              <div
+                key={i}
+                className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-slate-200 animate-pulse h-28"
+              />
+            ))
+          : statCards.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <div key={stat.label} className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-slate-200">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-slate-100 text-slate-700">
+                    <Icon size={20} />
+                  </div>
+                  <p className="text-2xl font-bold text-slate-900 mt-3">{stat.value}</p>
+                  <p className="text-xs text-slate-500 mt-1">{stat.label}</p>
+                  <p className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+                    <TrendingUp size={12} /> {stat.trend}
+                  </p>
+                </div>
+              );
+            })}
       </div>
 
-      {/* ROW: Kehadiran (Area) + Pengajuan (Line) */}
+      {/* ROW: Kehadiran (Area) + Distribusi Departemen (Bar) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-4">
@@ -203,8 +245,7 @@ function DashboardContent({
 
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-base font-semibold text-slate-900">Distribusi Karyawan per Divisi</h3>
-            <span className="text-xs text-slate-500 bg-slate-100 px-2 py-1 rounded-full">Contoh</span>
+            <h3 className="text-base font-semibold text-slate-900">Distribusi Karyawan per Departemen</h3>
           </div>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -220,22 +261,30 @@ function DashboardContent({
         </div>
       </div>
 
-      {/* ROW: Top Divisi + Notifikasi + Agenda */}
+      {/* ROW: Beban Kerja per Departemen + Notifikasi + Agenda */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
-          <h3 className="text-base font-semibold text-slate-900 mb-4">Beban Kerja per Divisi</h3>
+          <h3 className="text-base font-semibold text-slate-900 mb-4">Beban Kerja per Departemen</h3>
           <div className="flex flex-col gap-4">
-            {topDivisi.map((d) => (
-              <div key={d.name}>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-slate-700 font-medium">{d.name}</span>
-                  <span className="text-slate-400">{d.percent}%</span>
+            {departemen.length === 0 ? (
+              <p className="text-sm text-slate-400">Belum ada data departemen</p>
+            ) : (
+              // UBAH: percent sekarang langsung dari backend (d.percent), ga dihitung ulang di sini
+              departemen.map((d, i) => (
+                <div key={d.departemen}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-slate-700 font-medium">{d.departemen}</span>
+                    <span className="text-slate-400">{d.percent}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${divisiColors[i % divisiColors.length]}`}
+                      style={{ width: `${d.percent}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className={`h-full ${d.color}`} style={{ width: `${d.percent}%` }} />
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
 
