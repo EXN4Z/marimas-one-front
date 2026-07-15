@@ -44,7 +44,7 @@ export default function VerifyOtp() {
     setResendMsg('');
     try {
       await resendOtp(registrationId);
-      setResendMsg('Kode OTP baru sudah dikirim ke WhatsApp kamu');
+      setResendMsg('Kode OTP baru sudah dikirim ke email kamu');
     } catch {
       setResendMsg('Gagal mengirim ulang OTP');
     }
@@ -54,9 +54,9 @@ export default function VerifyOtp() {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-slate-900">Verifikasi WhatsApp</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Verifikasi Email</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Masukkan kode 6 digit yang dikirim ke WhatsApp kamu
+            Masukkan kode 6 digit yang dikirim ke email kamu
           </p>
         </div>
 
