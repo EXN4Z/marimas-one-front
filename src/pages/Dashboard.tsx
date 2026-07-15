@@ -18,11 +18,12 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/Chatwidget';
 import AppLayout from '../components/AppLayout';
 import api from '../api/axios';
+import { echo } from '../lib/echo'; // UBAH: sesuaikan path sesuai lokasi file echo.ts kamu
 import type { User as UserType } from '../types/user';
 
 // ====== MASIH DUMMY (belum ada endpoint di backend) ======
@@ -36,15 +37,7 @@ const attendanceTrend = [
   { day: 'Min', hadir: 5, target: 10 },
 ];
 
-// Palet warna di-cycle sesuai jumlah departemen asli dari database
 const divisiColors = ['bg-blue-500', 'bg-emerald-500', 'bg-violet-500', 'bg-amber-500', 'bg-rose-500', 'bg-cyan-500'];
-
-const notifications = [
-  { text: 'Izin kamu disetujui HR', time: '10 menit lalu', unread: true },
-  { text: 'Reminder: absen sebelum jam 09:00', time: '1 jam lalu', unread: true },
-  { text: 'Ticket #124 dikomentari Admin', time: '3 jam lalu', unread: false },
-  { text: 'Slip gaji bulan ini sudah tersedia', time: 'Kemarin', unread: false },
-];
 
 const upcomingEvents = [
   { title: 'Meeting Mingguan Divisi IT', date: 'Senin, 09:00' },
@@ -59,7 +52,6 @@ interface departemenDistribusi {
   percent: number;
 }
 
-// TAMBAH: tipe response dari /dashboard/stats-card (controller statsCard())
 interface StatItem {
   value: number | string;
   trend: string;
@@ -72,19 +64,34 @@ interface StatsCardResponse {
   ticket: StatItem;
 }
 
-// UBAH: fetchUser dipindah keluar komponen, dipakai queryFn
 async function fetchUser(): Promise<UserType> {
   const res = await api.get<UserType>('/user');
   return res.data;
 }
 
-// TAMBAH: fetch stats card dari backend
-async function fetchStatsCard(): Promise<StatsCardResponse> {
-  const res = await api.get<StatsCardResponse>('/dashboard/stats-card'); // TODO: sesuaikan route aslinya
+// UBAH: shape disesuaikan dengan response NotificationController::index
+interface NotificationItem {
+  id: string;
+  data: { message: string; nomor_izin?: string; status?: string; [key: string]: any };
+  read_at: string | null;
+  created_at: string;
+}
+
+interface NotificationsResponse {
+  data: NotificationItem[];
+  unread_count: number;
+}
+
+async function fetchNotifications(): Promise<NotificationsResponse> {
+  const res = await api.get<NotificationsResponse>('/notifications');
   return res.data;
 }
 
-// TAMBAH: gabungkan data asli dari backend dengan label & icon UI
+async function fetchStatsCard(): Promise<StatsCardResponse> {
+  const res = await api.get<StatsCardResponse>('/dashboard/stats-card');
+  return res.data;
+}
+
 function buildStatCards(stats?: StatsCardResponse) {
   if (!stats) return [];
   return [
@@ -98,34 +105,38 @@ function buildStatCards(stats?: StatsCardResponse) {
 export default function Dashboard() {
   const { user: cachedUser, setUser } = useAuth();
   const [departemen, setDepartemen] = useState<departemenDistribusi[]>([]);
+  const queryClient = useQueryClient();
 
-  // UBAH: useEffect + useState(loading/error) manual dihapus total, diganti useQuery
-  // staleTime 5 menit -> pindah halaman & balik lagi dalam 5 menit, ga fetch ulang
   const { data, isLoading, isError } = useQuery({
     queryKey: ['user'],
     queryFn: fetchUser,
     staleTime: 5 * 60 * 1000,
-    initialData: cachedUser ?? undefined, // UBAH: pakai user dari localStorage/context dulu sambil nunggu fetch, ga nge-blank
+    initialData: cachedUser ?? undefined,
   });
 
-  // TAMBAH: fetch stats card (kehadiran, izin, cuti, ticket) pakai useQuery juga
   const { data: statsCard } = useQuery({
     queryKey: ['stats-card'],
     queryFn: fetchStatsCard,
     staleTime: 5 * 60 * 1000,
   });
 
-  // UBAH: sync hasil query terbaru balik ke AuthContext (dipakai AppLayout, dll)
+  // TAMBAH: fetch notifikasi asli dari backend (bukan dummy lagi)
+  const { data: notificationsRes } = useQuery({
+    queryKey: ['notifications'],
+    queryFn: fetchNotifications,
+    staleTime: 60 * 1000,
+  });
+
+  const notifications = notificationsRes?.data ?? [];
+
   useEffect(() => {
     if (data) setUser(data);
   }, [data, setUser]);
 
-  // Fetch data distribusi departemen buat chart (dari /dashboard/kpd)
   useEffect(() => {
     api
       .get('/dashboard/kpd')
       .then((res) => {
-        console.log('BERHASIL', res.data);
         setDepartemen(res.data);
       })
       .catch((err) => {
@@ -133,8 +144,59 @@ export default function Dashboard() {
       });
   }, []);
 
-  const loading = isLoading && !cachedUser; // UBAH: cuma tampilin loading kalau bener2 belum ada data sama sekali
-  const error = isError ? 'Gagal memuat data user. Silakan login ulang.' : null; // UBAH: derived dari isError
+  // TAMBAH: subscribe ke private channel notifikasi user via Pusher/Echo
+  useEffect(() => {
+    if (!data?.id) return;
+
+    const channel = echo.private(`App.Models.User.${data.id}`);
+
+    // .notification() adalah helper bawaan Echo khusus untuk event
+    // Illuminate\Notifications\Events\BroadcastNotificationCreated
+    channel.notification((payload: any) => {
+      queryClient.setQueryData<NotificationsResponse | undefined>(['notifications'], (old) => {
+        const newItem: NotificationItem = {
+          id: payload.id,
+          data: {
+            message: payload.message,
+            nomor_izin: payload.nomor_izin,
+            status: payload.status,
+          },
+          read_at: null,
+          created_at: new Date().toISOString(),
+        };
+
+        return {
+          data: [newItem, ...(old?.data ?? [])].slice(0, 20),
+          unread_count: (old?.unread_count ?? 0) + 1,
+        };
+      });
+
+      // Izin baru diproses -> angka stats-card (izin pending, dsb) mungkin berubah
+      queryClient.invalidateQueries({ queryKey: ['stats-card'] });
+    });
+
+    return () => {
+      echo.leave(`App.Models.User.${data.id}`);
+    };
+  }, [data?.id, queryClient]);
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await api.post(`/notifications/${id}/read`);
+      queryClient.setQueryData<NotificationsResponse | undefined>(['notifications'], (old) => {
+        if (!old) return old;
+        return {
+          data: old.data.map((n) => (n.id === id ? { ...n, read_at: new Date().toISOString() } : n)),
+          unread_count: Math.max(0, old.unread_count - (old.data.find((n) => n.id === id && !n.read_at) ? 1 : 0)),
+        };
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  };
+
+  const loading = isLoading && !cachedUser;
+  const error = isError ? 'Gagal memuat data user. Silakan login ulang.' : null;
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -159,6 +221,8 @@ export default function Dashboard() {
         getGreeting={getGreeting}
         departemen={departemen}
         statCards={buildStatCards(statsCard)}
+        notifications={notifications}
+        onMarkAsRead={handleMarkAsRead}
       />
       <ChatWidget />
     </AppLayout>
@@ -170,11 +234,15 @@ function DashboardContent({
   getGreeting,
   departemen,
   statCards,
+  notifications,
+  onMarkAsRead,
 }: {
   error: string | null;
   getGreeting: () => string;
   departemen: departemenDistribusi[];
   statCards: ReturnType<typeof buildStatCards>;
+  notifications: NotificationItem[];
+  onMarkAsRead: (id: string) => void;
 }) {
   const { user } = useAuth();
 
@@ -193,8 +261,7 @@ function DashboardContent({
       {/* STAT CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.length === 0
-          ? // Skeleton sementara nunggu statsCard fetch selesai
-            Array.from({ length: 4 }).map((_, i) => (
+          ? Array.from({ length: 4 }).map((_, i) => (
               <div
                 key={i}
                 className="bg-white rounded-xl p-4 sm:p-5 shadow-sm border border-slate-200 animate-pulse h-28"
@@ -269,7 +336,6 @@ function DashboardContent({
             {departemen.length === 0 ? (
               <p className="text-sm text-slate-400">Belum ada data departemen</p>
             ) : (
-              // UBAH: percent sekarang langsung dari backend (d.percent), ga dihitung ulang di sini
               departemen.map((d, i) => (
                 <div key={d.departemen}>
                   <div className="flex justify-between text-sm mb-1">
@@ -288,19 +354,35 @@ function DashboardContent({
           </div>
         </div>
 
+        {/* UBAH: notifikasi sekarang dari state asli (query + realtime), bukan dummy */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 className="text-base font-semibold text-slate-900 mb-4">Notifikasi</h3>
-          <ul className="flex flex-col gap-3">
-            {notifications.map((n, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${n.unread ? 'bg-slate-900' : 'bg-slate-200'}`} />
-                <div>
-                  <p className={`text-sm ${n.unread ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>{n.text}</p>
-                  <p className="text-xs text-slate-400">{n.time}</p>
-                </div>
-              </li>
-            ))}
-          </ul>
+          {notifications.length === 0 ? (
+            <p className="text-sm text-slate-400">Belum ada notifikasi</p>
+          ) : (
+            <ul className="flex flex-col gap-3">
+              {notifications.map((n) => {
+                const unread = !n.read_at;
+                return (
+                  <li
+                    key={n.id}
+                    className="flex items-start gap-2 cursor-pointer"
+                    onClick={() => unread && onMarkAsRead(n.id)}
+                  >
+                    <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${unread ? 'bg-slate-900' : 'bg-slate-200'}`} />
+                    <div>
+                      <p className={`text-sm ${unread ? 'text-slate-800 font-medium' : 'text-slate-500'}`}>
+                        {n.data.message}
+                      </p>
+                      <p className="text-xs text-slate-400">
+                        {new Date(n.created_at).toLocaleString('id-ID')}
+                      </p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
