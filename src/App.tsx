@@ -15,8 +15,6 @@ import AiAssistant from './pages/AiAssistant';
 import Ticketing from './pages/Ticketing';
 import Settings from './pages/Settings';
 import AuditLog from './pages/AuditLog';
-import PengajuanCuti from './pages/PengajuanCuti';
-import CutiForm from './pages/CutiPageForm';
 import PengajuanIzin from './pages/PengajuanIzin';
 import IzinForm from './pages/IzinPageForm';
 import Analytics from './pages/DashboardAnalytics';
@@ -34,8 +32,6 @@ function App() {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/inventaris" element={<Inventaris />} />
             <Route path="/karyawan" element={<Karyawan />} />
-            <Route path="/cuti" element={<PengajuanCuti />} />
-            <Route path="/cuti/create" element={<CutiForm />} />
             <Route path="/izin" element={<PengajuanIzin />} />
             <Route path="/izin/create" element={<IzinForm />} />
             <Route path="/dashboard-analytics" element={<Analytics />} />
