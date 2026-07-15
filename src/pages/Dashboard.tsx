@@ -68,7 +68,7 @@ interface StatItem {
 interface StatsCardResponse {
   kehadiran: StatItem;
   izin: StatItem;
-  cuti: StatItem;
+  izinAktif: StatItem;
   ticket: StatItem;
 }
 
@@ -89,7 +89,7 @@ function buildStatCards(stats?: StatsCardResponse) {
   if (!stats) return [];
   return [
     { label: 'Kehadiran Bulan Ini', value: stats.kehadiran.value, trend: stats.kehadiran.trend, icon: QrCode },
-    { label: 'Cuti Tersisa', value: stats.cuti.value, trend: stats.cuti.trend, icon: CalendarDays },
+    { label: 'Cuti Tersisa', value: stats.izinAktif.value, trend: stats.izinAktif.trend, icon: CalendarDays },
     { label: 'Izin Pending', value: stats.izin.value, trend: stats.izin.trend, icon: FileText },
     { label: 'Ticket Aktif', value: stats.ticket.value, trend: stats.ticket.trend, icon: Ticket },
   ];
