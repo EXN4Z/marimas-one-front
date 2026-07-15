@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   QrCode,
   CalendarDays,
@@ -23,10 +23,9 @@ import { useAuth } from '../context/AuthContext';
 import ChatWidget from '../components/Chatwidget';
 import AppLayout from '../components/AppLayout';
 import api from '../api/axios';
-import { echo } from '../lib/echo'; // UBAH: sesuaikan path sesuai lokasi file echo.ts kamu
+import { echo } from '../lib/echo';
 import type { User as UserType } from '../types/user';
 
-// ====== MASIH DUMMY (belum ada endpoint di backend) ======
 const attendanceTrend = [
   { day: 'Sen', hadir: 42, target: 45 },
   { day: 'Sel', hadir: 44, target: 45 },
@@ -44,7 +43,6 @@ const upcomingEvents = [
   { title: 'Batas akhir laporan absensi', date: 'Rabu, 17:00' },
   { title: 'Training AI Assistant', date: 'Jumat, 13:00' },
 ];
-// ================================================================
 
 interface departemenDistribusi {
   departemen: string;
@@ -69,7 +67,6 @@ async function fetchUser(): Promise<UserType> {
   return res.data;
 }
 
-// UBAH: shape disesuaikan dengan response NotificationController::index
 interface NotificationItem {
   id: string;
   data: { message: string; nomor_izin?: string; status?: string; [key: string]: any };
@@ -102,6 +99,11 @@ function buildStatCards(stats?: StatsCardResponse) {
   ];
 }
 
+// TAMBAH: berapa lama (ms) notifikasi bertahan setelah dibaca sebelum auto-dihapus
+const AUTO_DELETE_AFTER_READ_MS = 30 * 60 * 1000; // 30 menit
+// TAMBAH: jumlah notifikasi yang kelihatan sebelum area jadi scrollable
+const NOTIF_VISIBLE_COUNT = 2;
+
 export default function Dashboard() {
   const { user: cachedUser, setUser } = useAuth();
   const [departemen, setDepartemen] = useState<departemenDistribusi[]>([]);
@@ -120,7 +122,6 @@ export default function Dashboard() {
     staleTime: 5 * 60 * 1000,
   });
 
-  // TAMBAH: fetch notifikasi asli dari backend (bukan dummy lagi)
   const { data: notificationsRes } = useQuery({
     queryKey: ['notifications'],
     queryFn: fetchNotifications,
@@ -144,14 +145,11 @@ export default function Dashboard() {
       });
   }, []);
 
-  // TAMBAH: subscribe ke private channel notifikasi user via Pusher/Echo
   useEffect(() => {
     if (!data?.id) return;
 
     const channel = echo.private(`App.Models.User.${data.id}`);
 
-    // .notification() adalah helper bawaan Echo khusus untuk event
-    // Illuminate\Notifications\Events\BroadcastNotificationCreated
     channel.notification((payload: any) => {
       queryClient.setQueryData<NotificationsResponse | undefined>(['notifications'], (old) => {
         const newItem: NotificationItem = {
@@ -171,7 +169,6 @@ export default function Dashboard() {
         };
       });
 
-      // Izin baru diproses -> angka stats-card (izin pending, dsb) mungkin berubah
       queryClient.invalidateQueries({ queryKey: ['stats-card'] });
     });
 
@@ -194,6 +191,59 @@ export default function Dashboard() {
       console.log(err);
     }
   };
+
+  // TAMBAH: hapus notifikasi (dipanggil otomatis 30 menit setelah dibaca)
+  const deleteNotification = async (id: string) => {
+    try {
+      await api.delete(`/notifications/${id}`);
+    } catch (err) {
+      console.log(err);
+    }
+    queryClient.setQueryData<NotificationsResponse | undefined>(['notifications'], (old) => {
+      if (!old) return old;
+      return { ...old, data: old.data.filter((n) => n.id !== id) };
+    });
+  };
+
+  // TAMBAH: jadwalkan auto-delete 30 menit setelah notifikasi dibaca.
+  // Kalau pas dicek ternyata udah lewat 30 menit dari read_at (misal user baru buka tab lagi), langsung dihapus.
+  const scheduledDeletes = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+
+  useEffect(() => {
+    notifications.forEach((n) => {
+      if (!n.read_at || scheduledDeletes.current[n.id]) return;
+
+      const readAt = new Date(n.read_at).getTime();
+      const deleteAt = readAt + AUTO_DELETE_AFTER_READ_MS;
+      const delay = deleteAt - Date.now();
+
+      if (delay <= 0) {
+        deleteNotification(n.id);
+        return;
+      }
+
+      scheduledDeletes.current[n.id] = setTimeout(() => {
+        deleteNotification(n.id);
+        delete scheduledDeletes.current[n.id];
+      }, delay);
+    });
+
+    // bersihkan timer punya notifikasi yang udah nggak ada lagi (misal kehapus dari tempat lain)
+    const currentIds = new Set(notifications.map((n) => n.id));
+    Object.keys(scheduledDeletes.current).forEach((id) => {
+      if (!currentIds.has(id)) {
+        clearTimeout(scheduledDeletes.current[id]);
+        delete scheduledDeletes.current[id];
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [notifications]);
+
+  useEffect(() => {
+    return () => {
+      Object.values(scheduledDeletes.current).forEach(clearTimeout);
+    };
+  }, []);
 
   const loading = isLoading && !cachedUser;
   const error = isError ? 'Gagal memuat data user. Silakan login ulang.' : null;
@@ -354,13 +404,16 @@ function DashboardContent({
           </div>
         </div>
 
-        {/* UBAH: notifikasi sekarang dari state asli (query + realtime), bukan dummy */}
+        {/* UBAH: notifikasi dibatasi tampil 4, sisanya scroll. Notif yang sudah dibaca auto-hapus 30 menit kemudian */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 className="text-base font-semibold text-slate-900 mb-4">Notifikasi</h3>
           {notifications.length === 0 ? (
             <p className="text-sm text-slate-400">Belum ada notifikasi</p>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul
+              className="flex flex-col gap-3 overflow-y-auto pr-1"
+              style={{ maxHeight: `${NOTIF_VISIBLE_COUNT * 68}px` }} // TAMBAH: ~68px per item, jadi 4 item kelihatan sebelum scroll
+            >
               {notifications.map((n) => {
                 const unread = !n.read_at;
                 return (
