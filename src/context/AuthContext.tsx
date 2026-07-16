@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
 import type { User } from '../types/user';
+import api from '../api/axios'; // BARU: sesuaikan path kalau instance axios kamu ada di tempat lain
 
 interface AuthContextType {
   user: User | null;
   setUser: (user: User | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -24,10 +25,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setUser(null);
+  // UBAH: logout sekarang beneran manggil backend dulu (biar token dicabut &
+  // password di-reset di server sesuai kebijakan lockout), baru bersihin localStorage.
+  // Kalau API call gagal (misal koneksi putus), tetap lanjut bersihin sisi client
+  // supaya user nggak nyangkut logged-in secara visual.
+  const logout = async () => {
+    try {
+      await api.post('/logout');
+    } catch (err) {
+      console.error('Gagal memanggil endpoint logout, tetap logout di sisi client:', err);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setUser(null);
+    }
   };
 
   return (
