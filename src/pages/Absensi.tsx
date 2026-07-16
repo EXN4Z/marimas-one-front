@@ -1,4 +1,4 @@
-import { useState } from 'react'; // UBAH: hapus useEffect, ga dipake lagi
+import { useState } from 'react';
 import {
   Users,
   UserCheck,
@@ -15,15 +15,16 @@ import {
 import AppLayout from '../components/AppLayout';
 import ScanQrModal from '../components/ScanQrModal';
 import KaryawanQrModal from '../components/KaryawanQrModal';
+import FaceCapture from '../components/FaceCapture'; // BARU: komponen kamera + GPS
 import {
   getKaryawanByKode,
   scanAbsen,
   type Karyawan,
   type Absensi,
   type Role,
-} from '../api/absensi'; // UBAH: getKaryawanAktif, getAbsensiHariIni, getRiwayatAbsensi dipindah ke hooks, ga di-import langsung lagi di sini
-import { useQueryClient } from '@tanstack/react-query'; // UBAH: baru, buat setQueryData
-import { useKaryawanAktif, useAbsensiHariIni, useRiwayatAbsensi } from '../hooks/useAbsensi'; // UBAH: baru
+} from '../api/absensi';
+import { useQueryClient } from '@tanstack/react-query';
+import { useKaryawanAktif, useAbsensiHariIni, useRiwayatAbsensi } from '../hooks/useAbsensi';
 
 type TabKey = 'semua' | 'sudah_absen' | 'belum_absen';
 
@@ -64,14 +65,13 @@ function formatWaktu(tanggal: string): string {
 }
 
 export default function AbsensiPage() {
-  const queryClient = useQueryClient(); // UBAH: baru
+  const queryClient = useQueryClient();
 
-  // UBAH: 4 baris di bawah ini gantiin useState karyawanList/absensiHariIni/riwayat/loading/error + loadData + useEffect (semuanya dihapus)
   const { data: karyawanList = [], isLoading: loadingKaryawan, isError: errorKaryawan } = useKaryawanAktif();
   const { data: absensiHariIni = [], isLoading: loadingAbsensi } = useAbsensiHariIni();
   const { data: riwayat = [] } = useRiwayatAbsensi(10);
-  const loading = loadingKaryawan || loadingAbsensi; // UBAH: gabungan loading dari 2 query utama
-  const error = errorKaryawan ? 'Gagal memuat data absensi. Coba refresh halaman.' : ''; // UBAH: derived dari isError, bukan state manual
+  const loading = loadingKaryawan || loadingAbsensi;
+  const error = errorKaryawan ? 'Gagal memuat data absensi. Coba refresh halaman.' : '';
 
   const [search, setSearch] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('semua');
@@ -82,11 +82,13 @@ export default function AbsensiPage() {
   const [submitting, setSubmitting] = useState(false);
   const [modalError, setModalError] = useState('');
 
+  // BARU: state untuk hasil capture wajah + GPS di dalam modal konfirmasi
+  const [capturedPhoto, setCapturedPhoto] = useState<Blob | null>(null);
+  const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
+
   const [scannerOpen, setScannerOpen] = useState(false);
   const [scanError, setScanError] = useState('');
   const [qrKaryawan, setQrKaryawan] = useState<Karyawan | null>(null);
-
-  // UBAH: loadData() dihapus total, react-query yang urus fetch + cache
 
   const findAbsensi = (pekerjaId: number) =>
     absensiHariIni.find((a) => a.karyawan_id === pekerjaId) || null;
@@ -120,6 +122,8 @@ export default function AbsensiPage() {
     setModalAbsensi(rec);
     setModalTipe(tipe);
     setModalError('');
+    setCapturedPhoto(null); // BARU: reset capture tiap buka modal
+    setGps(null); // BARU
   };
 
   const closeModal = () => {
@@ -127,6 +131,8 @@ export default function AbsensiPage() {
     setModalAbsensi(null);
     setModalTipe(null);
     setModalError('');
+    setCapturedPhoto(null); // BARU
+    setGps(null); // BARU
   };
 
   const handleScanSuccess = async (kode: string) => {
@@ -144,6 +150,8 @@ export default function AbsensiPage() {
       setModalAbsensi(absensi_hari_ini);
       setModalTipe(tipe);
       setModalError('');
+      setCapturedPhoto(null); // BARU: reset capture tiap hasil scan baru
+      setGps(null); // BARU
     } catch (err: any) {
       setScanError(
         err.response?.data?.message || `Kode "${kode}" tidak dikenali sebagai karyawan.`
@@ -152,14 +160,15 @@ export default function AbsensiPage() {
   };
 
   const handleConfirmAbsen = async () => {
-    if (!modalKaryawan || modalTipe === 'sudah_lengkap') return;
+    // BARU: wajib ada foto & lokasi sebelum submit
+    if (!modalKaryawan || modalTipe === 'sudah_lengkap' || !capturedPhoto || !gps) return;
 
     setSubmitting(true);
     setModalError('');
     try {
-      const result = await scanAbsen(modalKaryawan.qr_code);
+      // BARU: scanAbsen sekarang kirim foto + koordinat, bukan cuma qr_code
+      const result = await scanAbsen(modalKaryawan.qr_code, capturedPhoto, gps.lat, gps.lng);
 
-      // UBAH: setAbsensiHariIni(...) diganti queryClient.setQueryData ke key ['absensi-hari-ini']
       queryClient.setQueryData<Absensi[]>(['absensi-hari-ini'], (prev = []) => {
         const exists = prev.some((a) => a.id === result.absensi.id);
         return exists
@@ -167,7 +176,6 @@ export default function AbsensiPage() {
           : [...prev, result.absensi];
       });
 
-      // UBAH: setRiwayat(...) diganti queryClient.setQueryData ke key ['riwayat-absensi', 10]
       queryClient.setQueryData<Absensi[]>(['riwayat-absensi', 10], (prev = []) =>
         [{ ...result.absensi, pekerja: result.pekerja }, ...prev].slice(0, 10)
       );
@@ -179,8 +187,6 @@ export default function AbsensiPage() {
       setSubmitting(false);
     }
   };
-
-  // UBAH: blok "if (loading) return <AppLayout>...</AppLayout>" DIHAPUS TOTAL — dulu ini gate seluruh halaman
 
   return (
     <AppLayout title="Absensi">
@@ -440,15 +446,27 @@ export default function AbsensiPage() {
               </div>
             ) : (
               <>
+                {/* BARU: capture wajah + GPS sebelum bisa konfirmasi */}
+                <FaceCapture
+                  onCapture={(photo, lat, lng) => {
+                    setCapturedPhoto(photo);
+                    setGps({ lat, lng });
+                  }}
+                  onReset={() => {
+                    setCapturedPhoto(null);
+                    setGps(null);
+                  }}
+                />
+
                 {modalError && (
-                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-3">
+                  <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mt-3">
                     {modalError}
                   </p>
                 )}
                 <button
                   onClick={handleConfirmAbsen}
-                  disabled={submitting}
-                  className={`w-full text-white text-sm font-semibold py-3 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed ${
+                  disabled={submitting || !capturedPhoto || !gps} // BARU: wajib foto + lokasi dulu
+                  className={`w-full mt-3 text-white text-sm font-semibold py-3 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed ${
                     modalTipe === 'masuk' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-red-600 hover:bg-red-700'
                   }`}
                 >

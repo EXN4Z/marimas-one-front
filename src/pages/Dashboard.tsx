@@ -99,9 +99,7 @@ function buildStatCards(stats?: StatsCardResponse) {
   ];
 }
 
-// TAMBAH: berapa lama (ms) notifikasi bertahan setelah dibaca sebelum auto-dihapus
 const AUTO_DELETE_AFTER_READ_MS = 30 * 60 * 1000; // 30 menit
-// TAMBAH: jumlah notifikasi yang kelihatan sebelum area jadi scrollable
 const NOTIF_VISIBLE_COUNT = 2;
 
 export default function Dashboard() {
@@ -145,6 +143,13 @@ export default function Dashboard() {
       });
   }, []);
 
+  // TAMBAH: minta izin browser notification sekali pas dashboard dibuka
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
+
   useEffect(() => {
     if (!data?.id) return;
 
@@ -169,6 +174,14 @@ export default function Dashboard() {
         };
       });
 
+      // TAMBAH: pop-up notifikasi native browser/desktop
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Pengajuan Izin', {
+          body: payload.message,
+          icon: '/logo.png', // hapus baris ini kalau belum ada file logo.png di folder public/
+        });
+      }
+
       queryClient.invalidateQueries({ queryKey: ['stats-card'] });
     });
 
@@ -192,7 +205,6 @@ export default function Dashboard() {
     }
   };
 
-  // TAMBAH: hapus notifikasi (dipanggil otomatis 30 menit setelah dibaca)
   const deleteNotification = async (id: string) => {
     try {
       await api.delete(`/notifications/${id}`);
@@ -205,8 +217,6 @@ export default function Dashboard() {
     });
   };
 
-  // TAMBAH: jadwalkan auto-delete 30 menit setelah notifikasi dibaca.
-  // Kalau pas dicek ternyata udah lewat 30 menit dari read_at (misal user baru buka tab lagi), langsung dihapus.
   const scheduledDeletes = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   useEffect(() => {
@@ -228,7 +238,6 @@ export default function Dashboard() {
       }, delay);
     });
 
-    // bersihkan timer punya notifikasi yang udah nggak ada lagi (misal kehapus dari tempat lain)
     const currentIds = new Set(notifications.map((n) => n.id));
     Object.keys(scheduledDeletes.current).forEach((id) => {
       if (!currentIds.has(id)) {
@@ -308,7 +317,6 @@ function DashboardContent({
         </div>
       )}
 
-      {/* STAT CARDS */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {statCards.length === 0
           ? Array.from({ length: 4 }).map((_, i) => (
@@ -334,7 +342,6 @@ function DashboardContent({
             })}
       </div>
 
-      {/* ROW: Kehadiran (Area) + Distribusi Departemen (Bar) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <div className="flex items-center justify-between mb-4">
@@ -378,7 +385,6 @@ function DashboardContent({
         </div>
       </div>
 
-      {/* ROW: Beban Kerja per Departemen + Notifikasi + Agenda */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 className="text-base font-semibold text-slate-900 mb-4">Beban Kerja per Departemen</h3>
@@ -404,7 +410,6 @@ function DashboardContent({
           </div>
         </div>
 
-        {/* UBAH: notifikasi dibatasi tampil 4, sisanya scroll. Notif yang sudah dibaca auto-hapus 30 menit kemudian */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-200">
           <h3 className="text-base font-semibold text-slate-900 mb-4">Notifikasi</h3>
           {notifications.length === 0 ? (
@@ -412,7 +417,7 @@ function DashboardContent({
           ) : (
             <ul
               className="flex flex-col gap-3 overflow-y-auto pr-1"
-              style={{ maxHeight: `${NOTIF_VISIBLE_COUNT * 68}px` }} // TAMBAH: ~68px per item, jadi 4 item kelihatan sebelum scroll
+              style={{ maxHeight: `${NOTIF_VISIBLE_COUNT * 68}px` }}
             >
               {notifications.map((n) => {
                 const unread = !n.read_at;

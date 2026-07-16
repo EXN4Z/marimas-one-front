@@ -55,7 +55,22 @@ export async function getKaryawanByKode(
   return res.data;
 }
 
-export async function scanAbsen(qr_code: string): Promise<ScanResult> {
-  const res = await api.post<ScanResult>('/absensi/scan', { qr_code });
+// UBAH: scanAbsen sekarang wajib kirim foto wajah (Blob) + koordinat GPS,
+// dikirim sebagai multipart/form-data karena ada file di dalamnya.
+export async function scanAbsen(
+  qr_code: string,
+  photo: Blob,
+  latitude: number,
+  longitude: number
+): Promise<ScanResult> {
+  const formData = new FormData();
+  formData.append('qr_code', qr_code);
+  formData.append('photo', photo, 'absen.jpg');
+  formData.append('latitude', String(latitude));
+  formData.append('longitude', String(longitude));
+
+  const res = await api.post<ScanResult>('/absensi/scan', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  });
   return res.data;
 }
