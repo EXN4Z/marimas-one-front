@@ -71,7 +71,7 @@ export async function scanAbsen(
   formData.append('photo', photo, 'absen.jpg');
   formData.append('latitude', String(latitude));
   formData.append('longitude', String(longitude));
-  formData.append('face_verified', String(faceVerified));
+  formData.append('face_verified', String(faceVerified ? '1' : '0'));
   formData.append('face_match_distance', String(faceMatchDistance));
   if (karyawanId) formData.append('karyawan_id', String(karyawanId));
 
