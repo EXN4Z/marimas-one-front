@@ -1,43 +1,20 @@
-import { QrCode, CalendarDays, Ticket } from 'lucide-react';
-import { useDashboardCore, useDashboardAnalytics, buildStatCards } from './useDashboardData';
+import { useDashboardCore, useDashboardAnalytics } from './useDashboardData';
 import {
-  StatCardsGrid,
-  KehadiranMingguanCard,
-  DepartemenDistribusiCard,
-  BebanKerjaCard,
-  NotifikasiCard,
-  AgendaCard,
-  HeroPengajuanChart,
   RingkasanAsetCard,
-  TopKehadiranCard,
-  TopPengajuanCard,
+  HeroTrenPembelianAsetChart,
+  AsetPerhatianCard,
+  AsetPerJenisCard,
+  AktivitasAsetCard,
 } from './Shared';
 
 // Dashboard untuk role admin/hr/manajer — dapet semua section, termasuk
-// hero chart "Pengajuan Izin Tahun Ini" yang gak ditampilin di DashboardUser
-// maupun DashboardCabang.
+// hero chart "Tren Pembelian Aset per Bulan" yang gak ditampilin di
+// DashboardUser maupun DashboardCabang.
 export default function DashboardAdmin() {
-  const {
-    loading,
-    error,
-    statsCard,
-    notifications,
-    handleMarkAsRead,
-    kehadiranMingguan,
-    bebanKerja,
-    agenda,
-    agendaLoading,
-    departemen,
-  } = useDashboardCore();
+  const { loading, error } = useDashboardCore();
 
-  const { ringkasanAset, grafikPengajuan, topKehadiran, topKaryawan } = useDashboardAnalytics(true, {
-    ringkasanIzin: false,
-  });
-
-  const statCards = buildStatCards(statsCard, {
-    kehadiran: QrCode,
-    izinAktif: CalendarDays,
-    ticket: Ticket,
+  const { ringkasanAset, trenPembelianAset, asetPerhatian, asetPerJenis, aktivitasAsetTerbaru } = useDashboardAnalytics(true, {
+    statusAsetDistribusi: false,
   });
 
   if (loading) {
@@ -54,27 +31,21 @@ export default function DashboardAdmin() {
         <div className="mb-6 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg px-4 py-3">{error}</div>
       )}
 
-      <StatCardsGrid statCards={statCards} />
-
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mt-6">
-        <HeroPengajuanChart grafikPengajuan={grafikPengajuan} />
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <HeroTrenPembelianAsetChart trenPembelianAset={trenPembelianAset} />
         <RingkasanAsetCard ringkasanAset={ringkasanAset} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <KehadiranMingguanCard kehadiranMingguan={kehadiranMingguan} />
-        <DepartemenDistribusiCard departemen={departemen} />
+        <AsetPerhatianCard asetPerhatian={asetPerhatian} />
+        <AsetPerJenisCard asetPerJenis={asetPerJenis} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
-        <TopKehadiranCard topKehadiran={topKehadiran} />
-        <TopPengajuanCard topKaryawan={topKaryawan} />
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
-        <BebanKerjaCard bebanKerja={bebanKerja} />
-        <NotifikasiCard notifications={notifications} onMarkAsRead={handleMarkAsRead} />
-        <AgendaCard agenda={agenda} agendaLoading={agendaLoading} />
+      {/* Aktivitas Aset Terbaru -- feed histori aset (sumber sama dengan tab
+          Riwayat di Inventaris), ditaruh di dashboard biar user gak perlu
+          sadar dulu ada tab Riwayat buat lihat aktivitas terkini. */}
+      <div className="grid grid-cols-1 mt-6">
+        <AktivitasAsetCard aktivitasAsetTerbaru={aktivitasAsetTerbaru} />
       </div>
     </>
   );

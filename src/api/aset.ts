@@ -81,15 +81,6 @@ export interface AsetPenanganan {
   } | null;
 }
 
-export interface AsetPenggantianSparepart {
-  id: number;
-  aset_id: number;
-  tanggal: string;
-  nama_sparepart: string;
-  keterangan: string | null;
-  biaya: number | null;
-}
-
 export interface Aset {
   id: number;
   kode_aset: string;
@@ -113,7 +104,6 @@ export interface Aset {
   pemakai_saat_ini?: AsetPemakai | null;
   pemakai?: AsetPemakai[]; // riwayat lengkap, cuma keisi di endpoint show()
   penanganan?: AsetPenanganan[]; // riwayat lengkap, cuma keisi di endpoint show()
-  penggantian_sparepart?: AsetPenggantianSparepart[];
   penanganan_aktif?: { id: number; jenis_kerusakan: string; keluhan: string; tanggal_lapor: string } | null;
   // catatan penjualan/writeoff — cuma keisi kalau status aset 'dijual'
   writeoff?: {
@@ -153,6 +143,11 @@ export interface FotoPemakaiEntry {
   user?: { id: number; name: string } | null;
   tanggal_penerimaan: string | null;
   tanggal_pengembalian: string | null;
+  // waktu kejadian akurat (jam-menit-detik lengkap) -- tanggal_penerimaan/
+  // tanggal_pengembalian di atas cuma nyimpen tanggal doang. Lihat migration
+  // add_waktu_akurat_ke_aset_pemakai_dan_penanganan.
+  diterima_at: string | null;
+  dikembalikan_at: string | null;
   foto_penerimaan: string[] | null;
   foto_pengembalian: string[] | null;
   created_at: string;
@@ -226,6 +221,7 @@ export async function deleteAset(id: number, force = false): Promise<{ message: 
   return res.data;
 }
 
+
 /**
  * Cari karyawan atau akun cabang (buat dipilih sebagai pemakai aset). Pakai
  * endpoint /karyawan yang sudah ada (UserController::index), yang eager-load
@@ -254,6 +250,13 @@ export async function serahTerimaAset(asetId: number, formData: FormData) {
 // (struk asli pas serah-terima) buat validasi backend.
 export async function kembalikanAset(pemakaiId: number, formData: FormData) {
   const res = await api.post(`/aset-pemakai/${pemakaiId}/kembalikan`, formData);
+  return res.data;
+}
+
+// DELETE /aset-pemakai/{id} — admin hapus satu entri riwayat pemakaian.
+// Ditolak backend kalau entri ini punya laporan perbaikan yang nempel.
+export async function deletePemakaiAset(pemakaiId: number): Promise<{ message: string }> {
+  const res = await api.delete<{ message: string }>(`/aset-pemakai/${pemakaiId}`);
   return res.data;
 }
 
@@ -333,26 +336,6 @@ export async function selesaikanPenangananAset(
 // DELETE /aset-penanganan/{id} — dibatasi backend ke role admin.
 export async function deletePenangananAset(asetPenangananId: number): Promise<{ message: string }> {
   const res = await api.delete<{ message: string }>(`/aset-penanganan/${asetPenangananId}`);
-  return res.data;
-}
-
-// POST /aset/{aset}/penggantian-sparepart — dibatasi backend ke role admin.
-export async function tambahPenggantianSparepart(
-  asetId: number,
-  payload: {
-    tanggal: string;
-    nama_sparepart: string;
-    keterangan?: string;
-    biaya?: number;
-  }
-): Promise<AsetPenggantianSparepart> {
-  const res = await api.post<AsetPenggantianSparepart>(`/aset/${asetId}/penggantian-sparepart`, payload);
-  return res.data;
-}
-
-// DELETE /aset-penggantian-sparepart/{id} — dibatasi backend ke role admin.
-export async function deletePenggantianSparepart(id: number): Promise<{ message: string }> {
-  const res = await api.delete<{ message: string }>(`/aset-penggantian-sparepart/${id}`);
   return res.data;
 }
 

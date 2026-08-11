@@ -3,18 +3,13 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
-  QrCode,
-  Ticket,
-  Bot,
   ScrollText,
   Settings as SettingsIcon,
-  FileText,
   LogOut,
   Search,
   Menu,
   X,
   Package,
-  CalendarDays,
   FileSpreadsheet,
   Database,
   ChevronDown,
@@ -23,11 +18,12 @@ import {
   Boxes,
   Package2,
   Truck,
+  Wrench,
+  Images,
+  History,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useChat } from '../../context/ChatContext';
 import NotificationDropdown from './NotificationDropDown';
-import ChatWidget from './Chatwidget';
 
 interface NavChild {
   label: string;
@@ -43,21 +39,29 @@ interface NavItem {
   children?: NavChild[]; // kalau ada, item ini jadi dropdown di sidebar
   matchPrefix?: string; // dipakai buat nentuin dropdown auto-expand + highlight, termasuk buat route dinamis (mis. /karyawan/5/edit)
   restricted?: boolean; // true = halaman khusus admin/staff, bukan buat karyawan biasa (dipakai buat naro garis pemisah di sidebar)
+  hidden?: boolean; // true = fitur belum lengkap, disembunyikan dari sidebar sementara. Route & filenya TETAP ada, cuma gak ditampilkan di menu.
 }
 
 const navItems: NavItem[] = [
   { label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-  // Semua menu di bawah ini sengaja BUKAN dropdown — aksi "Tambah/Buat/Scan"-nya
-  // udah ada di dalam halaman list-nya sendiri (tombol di header / query ?action=),
-  // jadi gak perlu link duplikat di sidebar.
   { label: 'Data Karyawan', icon: Users, path: '/karyawan', matchPrefix: '/karyawan' },
-  { label: 'Absensi', icon: QrCode, path: '/absensi', matchPrefix: '/absensi' },
-  { label: 'Pengajuan Izin', icon: FileText, path: '/izin', matchPrefix: '/izin' },
-  { label: 'Ticketing', icon: Ticket, path: '/ticketing', matchPrefix: '/ticketing' },
-  { label: 'Inventaris', icon: Package, path: '/inventaris', matchPrefix: '/inventaris' },
-  { label: 'Agenda', icon: CalendarDays, path: '/agenda', matchPrefix: '/agenda' },
+  {
+    label: 'Inventaris',
+    icon: Package,
+    path: null,
+    matchPrefix: '/inventaris',
+    children: [
+      { label: 'Aset', icon: Package, path: '/inventaris?tab=aset' },
+      // Kelengkapan Aset sengaja gak dikasih link dropdown -- masih jarang
+      // kepake, disembunyikan dulu dari sidebar. Tab & kodenya tetap ada
+      // di Inventaris.tsx, cuma gak muncul di tab bar / sidebar sementara.
+      { label: 'Penanganan Aset', icon: Wrench, path: '/inventaris?tab=penanganan_aset', roles: ['admin'] },
+      { label: 'Foto Aset', icon: Images, path: '/inventaris?tab=foto_aset', roles: ['admin'] },
+      { label: 'Riwayat Aset', icon: History, path: '/inventaris?tab=riwayat_aset' },
+    ],
+  },
   { label: 'Cabang', icon: Building2, path: '/cabang', matchPrefix: '/cabang' },
-  { label: 'Laporan', icon: FileSpreadsheet, path: '/laporan', restricted: true },
+  { label: 'Laporan', icon: FileSpreadsheet, path: '/laporan', restricted: true, hidden: true },
   {
     label: 'Master Data',
     icon: Database,
@@ -72,7 +76,6 @@ const navItems: NavItem[] = [
       { label: 'Supplier', icon: Truck, path: '/master-data?tab=supplier' },
     ],
   },
-  { label: 'AI Assistant', icon: Bot, path: '/ai-assistant' },
   { label: 'Audit Log', icon: ScrollText, path: '/audit-log', restricted: true },
   { label: 'Settings', icon: SettingsIcon, path: '/settings' },
 ];
@@ -127,7 +130,6 @@ interface AppLayoutProps {
 
 export default function AppLayout({ title, children }: AppLayoutProps = {}) {
   const { user, logout } = useAuth();
-  const { resetChat } = useChat();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openDropdowns, setOpenDropdowns] = useState<Set<string>>(new Set());
   const [searchQuery, setSearchQuery] = useState('');
@@ -141,14 +143,17 @@ export default function AppLayout({ title, children }: AppLayoutProps = {}) {
 
   const STAFF_ROLES = ['admin', 'hr'];
   const REVIEWER_ROLES = ['admin', 'hr', 'manajer', 'manager', 'cabang'];
-  const ABSENSI_ROLES = ['admin', 'hr', 'manajer', 'manager'];
 
   const roleFilter = (item: NavItem) => {
+    // Fitur yang masih belum lengkap -- sembunyikan dari sidebar dulu (lihat flag `hidden` di navItems).
+    if (item.hidden) {
+      return false;
+    }
     // Master Data hanya untuk admin/hr
     if (item.label === 'Master Data' && !STAFF_ROLES.includes(user?.role ?? '')) {
       return false;
     }
-    if (item.label === 'Absensi' && !ABSENSI_ROLES.includes(user?.role ?? '')) {
+    if (item.label === 'Dashboard' && user?.role !== 'admin') {
       return false;
     }
     // Laporan untuk admin/hr/manajer
@@ -313,7 +318,6 @@ const handleLogout = async () => {
     // (unsubscribe push dulu selagi token masih valid, baru revoke). Jangan panggil
     // api.post('/logout') terpisah di sini -- itu bikin push unsubscribe-nya gagal
     // diam-diam (401) karena token keburu mati duluan.
-    resetChat();
     const res = await logout();
     navigate('/login', {
         replace: true,
@@ -325,7 +329,7 @@ const handleLogout = async () => {
   // bukan halaman penuh lagi — jadi navigasi ke sini WAJIB bawa state.backgroundLocation
   // supaya halaman yang lagi kebuka tetap mounted & kelihatan di belakangnya, gak
   // reload/hilang. Kalau path-nya gak ada di daftar ini, navigasi biasa aja.
-  const OVERLAY_PATHS = ['/karyawan/create', '/izin/create'];
+  const OVERLAY_PATHS = ['/karyawan/create'];
 
   const handleNavClick = (item: NavItem) => {
     if (item.children) {
@@ -571,7 +575,6 @@ const handleLogout = async () => {
           </div>
         </main>
       </div>
-      {location.pathname !== '/ai-assistant' && <ChatWidget />}
     </div>
   );
 }
